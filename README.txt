@@ -1,32 +1,25 @@
-Plugin Builder Results
+This plugin works alongside an ODK Central Server (not Kobo / Ona etc). It allows you to load geo-located data gathered in ODK Collect forms as QGIS temporary layers, as well as download associated attachments. It is designed to allow you to incrementally download submissions (by selecting a date range of when data was sent from ODK Collect to the server. You can, with caution, opt to load all records - bear in mind this could take some time for large datasets with lots of attachments.
 
-Your plugin QuODK was created in:
-    C:/Users/Chris/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins\quodk
+Set up
 
-Your QGIS plugin directory is located at:
-    C:/Users/Chris/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins
+Ask the person responsible for managing your ODK Central server to provide you with log-in details (hint: it may be useful to set up a separate web-user on Central with restricted access - e.g. Project Viewer). You can choose to save the password (stored in plain-text on your computer in the plug-in folder).
 
-What's Next:
+Loading data
 
-  * Copy the entire directory containing your new plugin to the QGIS plugin
-    directory
+Once you connect to your server you will get a list of ODK projects if appropriate, and then you can select the form you would like to download. If your form has repeat groups with location data you can select the repeat as well as the main form. You can load any form or repeat as a simple table if there is no location data (in case you want to link data in QGIS).
 
-  * Compile the resources file using pyrcc5
+You can select a different Projection for the layer to fit with your project / location (e.g. OSGB grid). You can also download data as CSV.
 
-  * Run the tests (``make test``)
+NOTE: By default QuODK only loads features with spatial data (point / line / polygon) so that they can be displayed in QGIS, but if you have some records that have no location data you can choose to include them and manual add relevant spatial data [once the layer is loaded, select the feature in the attribute table and then choose Add part in QGIS digitising toolbar] 
 
-  * Test the plugin by enabling it in the QGIS plugin manager
+Attachments
+After you have selected the data you can download related attachments to a folder on your computer. This plugin also creates a project variable called @ODK_image_path so that you can view the attachments in the attribute form by setting the default path to this variable. Be aware that the plugin might freeze for a while when it loads the attachments form if you have lots of submissions. If you choose to download all the attachments listed it can take a while, needing high bandwidth - use with caution. 
 
-  * Customize it by editing the implementation file: ``quodk.py``
+Credits
 
-  * Create your own custom icon, replacing the default icon.png
+This plugin was inspired by FooODK which written in Swahili for WWF Tanzania by Cuthbert-Langen Mushi. Code refactoring, additional features and translations were implemented by Chris York at Walking-the-Talk. The plugin uses the ODK Central API to access the server and more functionality is planned (e.g. working with entities, and potentially deleting submissions)...
 
-  * Modify your user interface by opening QuODK_dialog_base.ui in Qt Designer
+Find out more about ODK
 
-  * You can use the Makefile to compile your Ui and resource files when
-    you make changes. This requires GNU make (gmake)
-
-For more information, see the PyQGIS Developer Cookbook at:
-http://www.qgis.org/pyqgis-cookbook/index.html
-
-(C) 2011-2018 GeoApt LLC - geoapt.com
+ODK is an ecosystem of open source mobile data collection supported by a core development team and an active community.
+ODK website: https://getodk.org
