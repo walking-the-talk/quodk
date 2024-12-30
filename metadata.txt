@@ -6,30 +6,30 @@
 name=QuODK
 qgisMinimumVersion=3.0
 description=A link between ODK Central data and QGIS
-version=1.0
+version=1.1
 author=Walking-the-Talk
 email=chris.york@walking-the-talk.co.uk
 
 about=QuODK plug-in uses the ODK Central API to load data to QGIS as well as download attachments from the server
 
-tracker=http://github.org/walking-the-talk/quodk/issues
-repository=http://github.org/walking-the-talk/quodk
+tracker=http://github.com/walking-the-talk/quodk/issues
+repository=http://github.com/walking-the-talk/quodk
 # End of mandatory metadata
 
 # Recommended items:
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-# changelog=
+ changelog= 1.1: add include / exclude to the filter; minor code cleansing
 
 # Tags are comma separated with spaces allowed
 tags=python, odk, api
 
-homepage=https://walking-the-talk.co.uk/quodk
+homepage=http://github.com/walking-the-talk/quodk
 category=Plugins
 icon=icon.png
 # experimental flag
-experimental=True
+experimental=False
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False

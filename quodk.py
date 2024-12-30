@@ -205,11 +205,7 @@ class QuODK:
         if self.first_start == True:
             #self.first_start = False
             self.dlg = QuODKDialog()
-#        try: 
-#
-#        except:
-#            self.dlg.msg.setText('This plug-in requires Pandas to function. Please import the module to your QGIS python installation before proceeding')
-#            self.dlg.msg.setStyleSheet("background: red")
+
         #set default date range as today (24 hour period!)
         self.dlg.DateStart.setDate(datetime.now())
         self.dlg.DateEnd.setDate(datetime.now())
@@ -233,6 +229,7 @@ class QuODK:
         self.dlg.Attachments.clicked.connect(self.download_images)
         self.dlg.attributeFilter.setEnabled(False)
         self.dlg.filterValue.setEnabled(False)
+        self.dlg.filterExclude.setEnabled(False)
         self.dlg.Attachments.setEnabled(False) 
         self.dlg.save_csv.setEnabled(False)
         self.dlg.load_to_canvas.setEnabled(False) 
@@ -243,6 +240,7 @@ class QuODK:
         self.dlg.QuODK_label_2.setPixmap(pix)
         self.dlg.closeWindow.clicked.connect(self.dlg.reject)
 
+        self.dlg.filterExclude.clicked.connect(self.changeFilterState)
         
         #Load language labels
         self.language_EN()
@@ -270,12 +268,13 @@ class QuODK:
         self.dlg.label_daterange.setText('Get submissions from')
         self.dlg.label_formID.setText('ODK Form')
         self.dlg.label_repeatGroup.setText('Subset')
-        self.dlg.label_attributeFilter.setText('Filter on')
+        self.dlg.label_attributeFilter.setText('Filter')
         self.dlg.label_odk_geometry.setText('Geometry')
         self.dlg.label_date_to.setText('to')
         self.dlg.help_label.setText('Help')
         self.dlg.ODK_connect.setText('Connect to ODK Central')
         self.dlg.remove_groups.setText('Remove group \nheadings')
+        self.dlg.ignore_nogeom.setText('Include submissions \nwith no geometry')
         self.dlg.load_to_canvas.setText('Load layer to canvas')
         self.dlg.save_odk_pass.setText('Save password')
         self.dlg.load_all.setText('ignore dates')
@@ -302,6 +301,7 @@ class QuODK:
         self.tr_image_folder = "Select folder for images"
         self.tr_wait_images = "Please wait while the server collates images"
         self.tr_table_only = "Load table only (no geometry)"
+        self.tr_filterExclude = "in/out"
 
         self.dlg.quodk_tab.setTabText(0,'Submissions')
         self.dlg.quodk_tab.setTabText(1,'Settings')
@@ -356,10 +356,10 @@ class QuODK:
            
         odk_url = self.dlg.odk_url.text()
         odk_username = self.dlg.odk_username.text()
-        odk_pass = self.dlg.odk_pass.text()
-
+        
         if self.dlg.save_odk_pass.isChecked():
             store_pass = 'True'
+            odk_pass = self.dlg.odk_pass.text()
         else:
             store_pass = 'False'
             odk_pass = ''
@@ -645,6 +645,10 @@ class QuODK:
             self.df_submissions = self.get_Response(filter_url)
             submissionsTotal = self.df_submissions.shape[0]
             self.dlg.attributeFilter.setEnabled(True)
+            self.dlg.filterExclude.setEnabled(True)
+            self.dlg.filterExclude.setCheckable(True)
+#            self.dlg.filterExclude.isChecked(True)
+            self.changeFilterState()
             try:
                 self.AttachmentsTotal = self.df_submissions['__system.attachmentsPresent'].sum()
             except:
@@ -711,13 +715,25 @@ class QuODK:
         self.set_geometry()
 
     # ====================================================================================================
+    def changeFilterState(self):
+        #isChecked
+        if self.dlg.filterExclude.isChecked():
+            self.dlg.filterExclude.setText("Exclude")
+        else:
+            self.dlg.filterExclude.setText("Include")
+        self.set_geometry()
         
+    # ====================================================================================================
+ 
     def set_geometry(self): #triggered by geometry combo box AND when Filter is selected
             if self.keyLevel == "KEY":     #check if main form and get any filter
                 filterValue = str(self.dlg.filterValue.currentText())
                 attributeFilter = str(self.dlg.attributeFilter.currentText())
                 if self.dlg.filterValue.currentIndex() > 0:
-                    df_geomfilter = self.df_submissions[self.df_submissions[attributeFilter] == filterValue]
+                    if self.dlg.filterExclude.isChecked():
+                        df_geomfilter = self.df_submissions[self.df_submissions[attributeFilter] != filterValue]
+                    else:
+                        df_geomfilter = self.df_submissions[self.df_submissions[attributeFilter] == filterValue]
                 else:
                     df_geomfilter = self.df_submissions                    
             else:   #use repeat dataframe

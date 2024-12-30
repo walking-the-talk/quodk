@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
+    <width>832</width>
     <height>600</height>
    </rect>
   </property>
@@ -18,7 +18,7 @@
     <rect>
      <x>2</x>
      <y>2</y>
-     <width>798</width>
+     <width>821</width>
      <height>598</height>
     </rect>
    </property>
@@ -40,7 +40,7 @@
       <rect>
        <x>10</x>
        <y>240</y>
-       <width>771</width>
+       <width>801</width>
        <height>215</height>
       </rect>
      </property>
@@ -73,9 +73,9 @@
     <widget class="QPushButton" name="save_csv">
      <property name="geometry">
       <rect>
-       <x>220</x>
+       <x>240</x>
        <y>520</y>
-       <width>180</width>
+       <width>211</width>
        <height>41</height>
       </rect>
      </property>
@@ -129,7 +129,7 @@ projection or as a table-only</string>
       <rect>
        <x>10</x>
        <y>520</y>
-       <width>180</width>
+       <width>211</width>
        <height>41</height>
       </rect>
      </property>
@@ -239,7 +239,7 @@ projection or as a table-only</string>
       <rect>
        <x>640</x>
        <y>140</y>
-       <width>141</width>
+       <width>161</width>
        <height>50</height>
       </rect>
      </property>
@@ -333,7 +333,7 @@ headings</string>
       <rect>
        <x>10</x>
        <y>150</y>
-       <width>101</width>
+       <width>41</width>
        <height>30</height>
       </rect>
      </property>
@@ -347,7 +347,7 @@ headings</string>
       <enum>QFrame::NoFrame</enum>
      </property>
      <property name="text">
-      <string>Filter on</string>
+      <string>Filter</string>
      </property>
      <property name="scaledContents">
       <bool>true</bool>
@@ -409,7 +409,7 @@ headings</string>
       </font>
      </property>
      <property name="toolTip">
-      <string>Select Subset (Main or Repeat Questions)</string>
+      <string>Select Subset (Main form  or Repeat groups)</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_date_to">
@@ -442,7 +442,7 @@ headings</string>
       <rect>
        <x>330</x>
        <y>100</y>
-       <width>81</width>
+       <width>61</width>
        <height>30</height>
       </rect>
      </property>
@@ -456,7 +456,7 @@ headings</string>
       <string>Maswali ya kijirudia</string>
      </property>
      <property name="text">
-      <string>subset</string>
+      <string>Subset</string>
      </property>
      <property name="scaledContents">
       <bool>true</bool>
@@ -602,7 +602,7 @@ headings</string>
       <rect>
        <x>10</x>
        <y>460</y>
-       <width>581</width>
+       <width>611</width>
        <height>48</height>
       </rect>
      </property>
@@ -656,9 +656,9 @@ headings</string>
     <widget class="QPushButton" name="Attachments">
      <property name="geometry">
       <rect>
-       <x>430</x>
+       <x>470</x>
        <y>520</y>
-       <width>180</width>
+       <width>211</width>
        <height>41</height>
       </rect>
      </property>
@@ -689,40 +689,6 @@ headings</string>
       <bool>false</bool>
      </property>
     </widget>
-    <widget class="QLabel" name="label_filtervalue">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="geometry">
-      <rect>
-       <x>330</x>
-       <y>150</y>
-       <width>71</width>
-       <height>30</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <family>Candara</family>
-       <pointsize>11</pointsize>
-      </font>
-     </property>
-     <property name="frameShape">
-      <enum>QFrame::NoFrame</enum>
-     </property>
-     <property name="text">
-      <string>value</string>
-     </property>
-     <property name="scaledContents">
-      <bool>true</bool>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-     </property>
-     <property name="wordWrap">
-      <bool>false</bool>
-     </property>
-    </widget>
     <widget class="QLabel" name="label_projection">
      <property name="geometry">
       <rect>
@@ -737,6 +703,9 @@ headings</string>
        <family>Candara</family>
        <pointsize>11</pointsize>
       </font>
+     </property>
+     <property name="toolTip">
+      <string>Coordinate Reference System</string>
      </property>
      <property name="frameShape">
       <enum>QFrame::NoFrame</enum>
@@ -779,7 +748,7 @@ headings</string>
     <widget class="QProgressBar" name="progressBar">
      <property name="geometry">
       <rect>
-       <x>610</x>
+       <x>640</x>
        <y>470</y>
        <width>171</width>
        <height>31</height>
@@ -795,9 +764,9 @@ headings</string>
     <widget class="QLabel" name="QuODK_label">
      <property name="geometry">
       <rect>
-       <x>650</x>
+       <x>660</x>
        <y>40</y>
-       <width>121</width>
+       <width>141</width>
        <height>91</height>
       </rect>
      </property>
@@ -822,7 +791,7 @@ headings</string>
       <rect>
        <x>330</x>
        <y>50</y>
-       <width>81</width>
+       <width>71</width>
        <height>30</height>
       </rect>
      </property>
@@ -850,7 +819,7 @@ headings</string>
       <rect>
        <x>650</x>
        <y>10</y>
-       <width>121</width>
+       <width>151</width>
        <height>30</height>
       </rect>
      </property>
@@ -900,11 +869,14 @@ headings</string>
      </property>
      <property name="geometry">
       <rect>
-       <x>370</x>
+       <x>70</x>
        <y>150</y>
        <width>21</width>
        <height>30</height>
       </rect>
+     </property>
+     <property name="toolTip">
+      <string>clear filter</string>
      </property>
      <property name="text">
       <string>X</string>
@@ -913,7 +885,7 @@ headings</string>
     <widget class="QPushButton" name="closeWindow">
      <property name="geometry">
       <rect>
-       <x>690</x>
+       <x>720</x>
        <y>520</y>
        <width>91</width>
        <height>41</height>
@@ -954,7 +926,7 @@ headings</string>
       <rect>
        <x>640</x>
        <y>190</y>
-       <width>141</width>
+       <width>171</width>
        <height>41</height>
       </rect>
      </property>
@@ -973,6 +945,31 @@ with no geometry</string>
      </property>
      <property name="checked">
       <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="filterExclude">
+     <property name="geometry">
+      <rect>
+       <x>329</x>
+       <y>150</y>
+       <width>61</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string>change filter to include or exclude the value selected</string>
+     </property>
+     <property name="autoFillBackground">
+      <bool>false</bool>
+     </property>
+     <property name="text">
+      <string>in / out</string>
      </property>
     </widget>
    </widget>
@@ -1172,7 +1169,7 @@ with no geometry</string>
       <rect>
        <x>10</x>
        <y>200</y>
-       <width>771</width>
+       <width>801</width>
        <height>21</height>
       </rect>
      </property>
@@ -1202,7 +1199,7 @@ with no geometry</string>
       <rect>
        <x>10</x>
        <y>230</y>
-       <width>771</width>
+       <width>801</width>
        <height>331</height>
       </rect>
      </property>
@@ -1228,7 +1225,7 @@ with no geometry</string>
     <widget class="QLabel" name="WTT_label">
      <property name="geometry">
       <rect>
-       <x>560</x>
+       <x>590</x>
        <y>170</y>
        <width>151</width>
        <height>51</height>
@@ -1302,7 +1299,7 @@ with no geometry</string>
     <widget class="QLabel" name="QuODK_label_2">
      <property name="geometry">
       <rect>
-       <x>520</x>
+       <x>550</x>
        <y>0</y>
        <width>231</width>
        <height>151</height>
