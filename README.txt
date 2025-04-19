@@ -1,5 +1,12 @@
 This plugin works alongside an ODK Central Server (not Kobo / Ona etc). It allows you to load geo-located data gathered in ODK Collect forms as QGIS temporary layers, as well as download associated attachments. It is designed to allow you to incrementally download submissions (by selecting a date range of when data was sent from ODK Collect to the server. You can, with caution, opt to load all records - bear in mind this could take some time for large datasets with lots of attachments.
 
+Prerequisites / dependencies
+
+QuODK requires PANDAS package to be installed in order to function: https://pandas.pydata.org/pandas-docs/stable/getting_started/install.html
+You could use "pip install pandas" 
+WINDOWS: open OSGEO4W command line to ensure it is installed in the correct version
+LINUX / MACOS: you may need to set up a virtual environment to install the pandas package - and avoid conflict
+
 Set up
 
 Ask the person responsible for managing your ODK Central server to provide you with log-in details (hint: it may be useful to set up a separate web-user on Central with restricted access - e.g. Project Viewer). You can choose to save the password (stored in plain-text on your computer in the plug-in folder).
