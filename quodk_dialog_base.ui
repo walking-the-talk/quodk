@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>832</width>
-    <height>600</height>
+    <width>824</width>
+    <height>645</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>2</x>
      <y>2</y>
      <width>821</width>
-     <height>598</height>
+     <height>651</height>
     </rect>
    </property>
    <property name="font">
@@ -33,13 +33,13 @@
    </property>
    <widget class="QWidget" name="Submissions_tab">
     <attribute name="title">
-     <string>Submissions</string>
+     <string>Download Submissions and Entities</string>
     </attribute>
     <widget class="QTableWidget" name="dataTable">
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>240</y>
+       <y>295</y>
        <width>801</width>
        <height>215</height>
       </rect>
@@ -58,7 +58,7 @@
      <property name="geometry">
       <rect>
        <x>400</x>
-       <y>200</y>
+       <y>250</y>
        <width>231</width>
        <height>30</height>
       </rect>
@@ -74,7 +74,7 @@
      <property name="geometry">
       <rect>
        <x>240</x>
-       <y>520</y>
+       <y>570</y>
        <width>211</width>
        <height>41</height>
       </rect>
@@ -106,7 +106,7 @@ projection or as a table-only</string>
      <property name="geometry">
       <rect>
        <x>100</x>
-       <y>150</y>
+       <y>200</y>
        <width>221</width>
        <height>30</height>
       </rect>
@@ -128,7 +128,7 @@ projection or as a table-only</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>520</y>
+       <y>570</y>
        <width>211</width>
        <height>41</height>
       </rect>
@@ -156,7 +156,7 @@ projection or as a table-only</string>
      <property name="geometry">
       <rect>
        <x>190</x>
-       <y>0</y>
+       <y>60</y>
        <width>131</width>
        <height>30</height>
       </rect>
@@ -238,7 +238,7 @@ projection or as a table-only</string>
      <property name="geometry">
       <rect>
        <x>640</x>
-       <y>140</y>
+       <y>190</y>
        <width>161</width>
        <height>50</height>
       </rect>
@@ -266,7 +266,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>100</x>
-       <y>200</y>
+       <y>250</y>
        <width>221</width>
        <height>30</height>
       </rect>
@@ -304,7 +304,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>520</x>
-       <y>0</y>
+       <y>60</y>
        <width>141</width>
        <height>30</height>
       </rect>
@@ -332,7 +332,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>150</y>
+       <y>200</y>
        <width>41</width>
        <height>30</height>
       </rect>
@@ -363,7 +363,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>200</y>
+       <y>250</y>
        <width>101</width>
        <height>30</height>
       </rect>
@@ -396,9 +396,9 @@ headings</string>
     <widget class="QComboBox" name="repeatGroup">
      <property name="geometry">
       <rect>
-       <x>400</x>
-       <y>100</y>
-       <width>231</width>
+       <x>100</x>
+       <y>150</y>
+       <width>221</width>
        <height>30</height>
       </rect>
      </property>
@@ -419,7 +419,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>330</x>
-       <y>0</y>
+       <y>60</y>
        <width>31</width>
        <height>30</height>
       </rect>
@@ -440,9 +440,9 @@ headings</string>
     <widget class="QLabel" name="label_repeatGroup">
      <property name="geometry">
       <rect>
-       <x>330</x>
-       <y>100</y>
-       <width>61</width>
+       <x>10</x>
+       <y>150</y>
+       <width>71</width>
        <height>30</height>
       </rect>
      </property>
@@ -453,7 +453,7 @@ headings</string>
       </font>
      </property>
      <property name="toolTip">
-      <string>Maswali ya kijirudia</string>
+      <string/>
      </property>
      <property name="text">
       <string>Subset</string>
@@ -503,7 +503,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>0</y>
+       <y>60</y>
        <width>181</width>
        <height>30</height>
       </rect>
@@ -537,7 +537,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>360</x>
-       <y>0</y>
+       <y>60</y>
        <width>141</width>
        <height>30</height>
       </rect>
@@ -601,7 +601,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>460</y>
+       <y>515</y>
        <width>611</width>
        <height>48</height>
       </rect>
@@ -635,7 +635,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>400</x>
-       <y>150</y>
+       <y>200</y>
        <width>231</width>
        <height>30</height>
       </rect>
@@ -657,7 +657,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>470</x>
-       <y>520</y>
+       <y>570</y>
        <width>211</width>
        <height>41</height>
       </rect>
@@ -693,7 +693,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>330</x>
-       <y>200</y>
+       <y>250</y>
        <width>51</width>
        <height>30</height>
       </rect>
@@ -730,7 +730,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>400</x>
-       <y>50</y>
+       <y>20</y>
        <width>231</width>
        <height>30</height>
       </rect>
@@ -749,7 +749,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>640</x>
-       <y>470</y>
+       <y>520</y>
        <width>171</width>
        <height>31</height>
       </rect>
@@ -776,9 +776,6 @@ headings</string>
      <property name="text">
       <string/>
      </property>
-     <property name="pixmap">
-      <pixmap>../../../../Users/user/Pictures/WWF_Box_Logo/logo.jpg</pixmap>
-     </property>
      <property name="scaledContents">
       <bool>true</bool>
      </property>
@@ -790,7 +787,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>330</x>
-       <y>50</y>
+       <y>20</y>
        <width>71</width>
        <height>30</height>
       </rect>
@@ -842,7 +839,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>40</y>
+       <y>10</y>
        <width>311</width>
        <height>41</height>
       </rect>
@@ -870,7 +867,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>70</x>
-       <y>150</y>
+       <y>200</y>
        <width>21</width>
        <height>30</height>
       </rect>
@@ -886,7 +883,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>720</x>
-       <y>520</y>
+       <y>570</y>
        <width>91</width>
        <height>41</height>
       </rect>
@@ -900,7 +897,7 @@ headings</string>
       </font>
      </property>
      <property name="toolTip">
-      <string>Download Data </string>
+      <string/>
      </property>
      <property name="text">
       <string>Close</string>
@@ -925,7 +922,7 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>640</x>
-       <y>190</y>
+       <y>240</y>
        <width>171</width>
        <height>41</height>
       </rect>
@@ -951,7 +948,7 @@ with no geometry</string>
      <property name="geometry">
       <rect>
        <x>329</x>
-       <y>150</y>
+       <y>200</y>
        <width>61</width>
        <height>31</height>
       </rect>
@@ -970,6 +967,819 @@ with no geometry</string>
      </property>
      <property name="text">
       <string>in / out</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="entity_status">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>400</x>
+       <y>150</y>
+       <width>231</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string>Select new or updated entities within the dataset</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="dataset">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>400</x>
+       <y>100</y>
+       <width>231</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string/>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_dataset">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>330</x>
+       <y>100</y>
+       <width>71</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Entities</string>
+     </property>
+     <property name="scaledContents">
+      <bool>true</bool>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     </property>
+     <property name="wordWrap">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_entityStatus">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>330</x>
+       <y>150</y>
+       <width>71</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string>Stauts of Entity</string>
+     </property>
+     <property name="text">
+      <string>Type</string>
+     </property>
+     <property name="scaledContents">
+      <bool>true</bool>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     </property>
+     <property name="wordWrap">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QFrame" name="entities_frame">
+     <property name="geometry">
+      <rect>
+       <x>322</x>
+       <y>98</y>
+       <width>315</width>
+       <height>91</height>
+      </rect>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+    </widget>
+    <widget class="QFrame" name="submissions_frame">
+     <property name="geometry">
+      <rect>
+       <x>8</x>
+       <y>98</y>
+       <width>315</width>
+       <height>91</height>
+      </rect>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+    </widget>
+    <zorder>submissions_frame</zorder>
+    <zorder>entities_frame</zorder>
+    <zorder>dataTable</zorder>
+    <zorder>crs</zorder>
+    <zorder>save_csv</zorder>
+    <zorder>attributeFilter</zorder>
+    <zorder>load_to_canvas</zorder>
+    <zorder>DateStart</zorder>
+    <zorder>remove_groups</zorder>
+    <zorder>odk_geometry</zorder>
+    <zorder>formID</zorder>
+    <zorder>load_all</zorder>
+    <zorder>label_attributeFilter</zorder>
+    <zorder>label_odk_geometry</zorder>
+    <zorder>repeatGroup</zorder>
+    <zorder>label_date_to</zorder>
+    <zorder>label_repeatGroup</zorder>
+    <zorder>label_formID</zorder>
+    <zorder>label_daterange</zorder>
+    <zorder>DateEnd</zorder>
+    <zorder>msg</zorder>
+    <zorder>filterValue</zorder>
+    <zorder>Attachments</zorder>
+    <zorder>label_projection</zorder>
+    <zorder>projectID</zorder>
+    <zorder>progressBar</zorder>
+    <zorder>QuODK_label</zorder>
+    <zorder>label_projectID</zorder>
+    <zorder>status</zorder>
+    <zorder>ODK_connect</zorder>
+    <zorder>clearFilter</zorder>
+    <zorder>closeWindow</zorder>
+    <zorder>ignore_nogeom</zorder>
+    <zorder>filterExclude</zorder>
+    <zorder>entity_status</zorder>
+    <zorder>dataset</zorder>
+    <zorder>label_dataset</zorder>
+    <zorder>label_entityStatus</zorder>
+   </widget>
+   <widget class="QWidget" name="tab">
+    <attribute name="title">
+     <string>Entity management</string>
+    </attribute>
+    <widget class="QgsCheckableComboBox" name="Elist_properties">
+     <property name="geometry">
+      <rect>
+       <x>200</x>
+       <y>220</y>
+       <width>611</width>
+       <height>27</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QgsFieldComboBox" name="Elist_label">
+     <property name="geometry">
+      <rect>
+       <x>200</x>
+       <y>140</y>
+       <width>200</width>
+       <height>27</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_Dataset_name">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>60</y>
+       <width>180</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>List Name</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_entity_label">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>140</y>
+       <width>180</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Unique Label field</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_entity_properties">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>220</y>
+       <width>180</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Fields to include</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="Elist_name">
+     <property name="geometry">
+      <rect>
+       <x>200</x>
+       <y>60</y>
+       <width>200</width>
+       <height>27</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="selected_features">
+     <property name="geometry">
+      <rect>
+       <x>420</x>
+       <y>60</y>
+       <width>221</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>Selected features only</string>
+     </property>
+    </widget>
+    <widget class="QTableWidget" name="Entity_table">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>295</y>
+       <width>801</width>
+       <height>215</height>
+      </rect>
+     </property>
+     <property name="toolTip">
+      <string>preview data table</string>
+     </property>
+     <property name="sizeAdjustPolicy">
+      <enum>QAbstractScrollArea::AdjustToContents</enum>
+     </property>
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_uuid">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>180</y>
+       <width>180</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="toolTip">
+      <string/>
+     </property>
+     <property name="text">
+      <string>UUID field (optional)</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_QGIS_layer">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>100</y>
+       <width>181</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>QGIS Canvas layer</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_dataset_existing">
+     <property name="geometry">
+      <rect>
+       <x>420</x>
+       <y>100</y>
+       <width>121</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Exsiting lists</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="export_Elist_to_csv">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>570</y>
+       <width>161</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string/>
+     </property>
+     <property name="text">
+      <string>Export to CSV</string>
+     </property>
+     <property name="autoDefault">
+      <bool>false</bool>
+     </property>
+     <property name="default">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="ODK_connect_3">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>311</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="autoFillBackground">
+      <bool>false</bool>
+     </property>
+     <property name="text">
+      <string>Connect to ODK Central</string>
+     </property>
+     <property name="flat">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QgsFieldComboBox" name="QGIS_KEY">
+     <property name="geometry">
+      <rect>
+       <x>200</x>
+       <y>180</y>
+       <width>200</width>
+       <height>27</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="msg2">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>515</y>
+       <width>611</width>
+       <height>48</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string>Status feedback</string>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="textFormat">
+      <enum>Qt::PlainText</enum>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="precheck_csv">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>250</y>
+       <width>181</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string/>
+     </property>
+     <property name="text">
+      <string>pre-check Entity List</string>
+     </property>
+     <property name="autoDefault">
+      <bool>false</bool>
+     </property>
+     <property name="default">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QTextBrowser" name="existing_lists">
+     <property name="geometry">
+      <rect>
+       <x>539</x>
+       <y>100</y>
+       <width>271</width>
+       <height>111</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
+     <property name="acceptDrops">
+      <bool>false</bool>
+     </property>
+     <property name="toolTip">
+      <string>HINT: copy and paste an existing list
+if updating or merging</string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="textInteractionFlags">
+      <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+     </property>
+     <property name="openExternalLinks">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_projectID_2">
+     <property name="geometry">
+      <rect>
+       <x>330</x>
+       <y>20</y>
+       <width>71</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Project</string>
+     </property>
+     <property name="scaledContents">
+      <bool>true</bool>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     </property>
+     <property name="wordWrap">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="projectID_entity">
+     <property name="geometry">
+      <rect>
+       <x>400</x>
+       <y>20</y>
+       <width>231</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string>Select Project</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="closeWindow_2">
+     <property name="geometry">
+      <rect>
+       <x>720</x>
+       <y>570</y>
+       <width>91</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>12</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string/>
+     </property>
+     <property name="text">
+      <string>Close</string>
+     </property>
+     <property name="checkable">
+      <bool>false</bool>
+     </property>
+     <property name="autoDefault">
+      <bool>false</bool>
+     </property>
+     <property name="default">
+      <bool>false</bool>
+     </property>
+     <property name="flat">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QgsMapLayerComboBox" name="layer_to_Elist">
+     <property name="geometry">
+      <rect>
+       <x>200</x>
+       <y>100</y>
+       <width>201</width>
+       <height>27</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QPlainTextEdit" name="pyODK_code">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>295</y>
+       <width>801</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>11</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string>This is the [sample] code for pyODK (copy and paste)</string>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radio_new_code">
+     <property name="geometry">
+      <rect>
+       <x>320</x>
+       <y>580</y>
+       <width>91</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="toolTip">
+      <string>CREATE new entity list</string>
+     </property>
+     <property name="text">
+      <string>Create</string>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radio_merge_code">
+     <property name="geometry">
+      <rect>
+       <x>420</x>
+       <y>580</y>
+       <width>91</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="toolTip">
+      <string>MERGE items in existing entity list
+(new entities or update existing)</string>
+     </property>
+     <property name="text">
+      <string>Merge</string>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radio_update_code">
+     <property name="geometry">
+      <rect>
+       <x>520</x>
+       <y>580</y>
+       <width>91</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="toolTip">
+      <string>UPDATE existing entitiies within a list</string>
+     </property>
+     <property name="text">
+      <string>Update</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_radio_group">
+     <property name="geometry">
+      <rect>
+       <x>180</x>
+       <y>580</y>
+       <width>131</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>pyODK recipe</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radio_delete_code">
+     <property name="geometry">
+      <rect>
+       <x>630</x>
+       <y>580</y>
+       <width>91</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="toolTip">
+      <string>DELETE existing entitiies within a list</string>
+     </property>
+     <property name="text">
+      <string>Delete</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="save_config">
+     <property name="geometry">
+      <rect>
+       <x>650</x>
+       <y>250</y>
+       <width>161</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string/>
+     </property>
+     <property name="text">
+      <string>Save configuration</string>
+     </property>
+     <property name="autoDefault">
+      <bool>false</bool>
+     </property>
+     <property name="default">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QLabel" name="status_2">
+     <property name="geometry">
+      <rect>
+       <x>650</x>
+       <y>10</y>
+       <width>151</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>14</pointsize>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>Status</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="QuODK_label_3">
+     <property name="geometry">
+      <rect>
+       <x>680</x>
+       <y>40</y>
+       <width>101</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Plain</enum>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="scaledContents">
+      <bool>true</bool>
+     </property>
+     <property name="wordWrap">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="load_entity_list_to_canvas">
+     <property name="geometry">
+      <rect>
+       <x>650</x>
+       <y>520</y>
+       <width>161</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string/>
+     </property>
+     <property name="text">
+      <string>Load CSV to canvas</string>
+     </property>
+     <property name="autoDefault">
+      <bool>false</bool>
+     </property>
+     <property name="default">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="onlycsv">
+     <property name="geometry">
+      <rect>
+       <x>230</x>
+       <y>260</y>
+       <width>291</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>use as external CSV instead of Entity List</string>
      </property>
     </widget>
    </widget>
@@ -1311,9 +2121,6 @@ with no geometry</string>
      <property name="text">
       <string/>
      </property>
-     <property name="pixmap">
-      <pixmap>../../../../Users/user/Pictures/WWF_Box_Logo/logo.jpg</pixmap>
-     </property>
      <property name="scaledContents">
       <bool>true</bool>
      </property>
@@ -1325,6 +2132,21 @@ with no geometry</string>
   </widget>
  </widget>
  <customwidgets>
+  <customwidget>
+   <class>QgsCheckableComboBox</class>
+   <extends>QComboBox</extends>
+   <header>qgscheckablecombobox.h</header>
+  </customwidget>
+  <customwidget>
+   <class>QgsFieldComboBox</class>
+   <extends>QComboBox</extends>
+   <header>qgsfieldcombobox.h</header>
+  </customwidget>
+  <customwidget>
+   <class>QgsMapLayerComboBox</class>
+   <extends>QComboBox</extends>
+   <header>qgsmaplayercombobox.h</header>
+  </customwidget>
   <customwidget>
    <class>QgsProjectionSelectionWidget</class>
    <extends>QWidget</extends>

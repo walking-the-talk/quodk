@@ -1,16 +1,17 @@
 # This file contains metadata for your plugin.
 
-# This file should be included when you package your plugin.# Mandatory items:
+# This file should be included when you package your plugin.
+# Mandatory items:
 
 [general]
 name=QuODK
-qgisMinimumVersion=3.0
-description=A link between ODK Central data and QGIS
-version=1.1
+qgisMinimumVersion=3.30
+description=A bridge between ODK Central data and QGIS for loading ODK submissions and managing entities
+version=1.2
 author=Walking-the-Talk
 email=chris.york@walking-the-talk.co.uk
 
-about=QuODK plug-in uses the ODK Central API to load data to QGIS as well as download attachments from the server
+about=QuODK plug-in uses the ODK Central API to load data to QGIS as well as download attachments from the server. Since 1.2 allows download of Entities as layers  and Entity management (for use with pyODK to create update and merge Entity Lists)
 
 tracker=http://github.com/walking-the-talk/quodk/issues
 repository=http://github.com/walking-the-talk/quodk
@@ -20,7 +21,7 @@ repository=http://github.com/walking-the-talk/quodk
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
- changelog= 1.1: add include / exclude to the filter; minor code cleansing
+ changelog= 1.2: Entity management; minor enhancements; bug fixes 1.1: add include / exclude to the filter; minor code cleansing
 
 # Tags are comma separated with spaces allowed
 tags=python, odk, api
@@ -29,7 +30,7 @@ homepage=http://github.com/walking-the-talk/quodk
 category=Plugins
 icon=icon.png
 # experimental flag
-experimental=False
+experimental=True
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
@@ -37,7 +38,7 @@ deprecated=False
 # Since QGIS 3.8, a comma separated list of plugins to be installed
 # (or upgraded) can be specified.
 # Check the documentation for more information.
-# plugin_dependencies=
+plugin_dependencies= Pandas
 
 Category of the plugin: Raster, Vector, Database or Web
 # category=
