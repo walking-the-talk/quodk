@@ -54,19 +54,19 @@ The plugin is built around drop-down combo-boxes, check-boxes and push-buttons t
 
 Once you connect to your server you will get a list of ODK projects that you are authorised to view and then you can select the form you would like to download submissions. If your form has repeat groups with location data you can select the repeat as well as the main form - each Repeat Group will be a separate layer in QGIS and QuODK retains the relationships between the main form and repeat using the KEY and PARENT_KEY fields. You can load any form or repeat as a simple table if there is no location data (in case you want to link data in QGIS).
 
-![screen-shot of Form selection](/Screenshot2.png, "Select a form from a project")
+![screen-shot of Form selection](/Screenshot2.png)
 
 Use the date filters to restrict the scope of the download from the server (particularly useful if you have a slow connection or large dataset). You can optionally ignore dates - but be aware that this downloads ALL submissions for the given form or repeat. **NOTE** ODK Central stores submissions in UTC time (equivalent to GMT). QuODK has a simple internationalisation feature to account for your time zone if required - due to Python / Windows inconsistencies, the method used might fail around the time of clocks changing - please be aware of this if you are trying to download submissions on a daily basis around this time of year. In all other situations it would probably be cumbersome to include an hourly option for the date filter. 
 
-![screen-shot of date filters](/Screenshot3.png, "Use date filters to access a sub-set of submissions") ![screen-shot of all submissions](screenshot4.png, "Check ignore dates to load all submissions")
+![screen-shot of date filters](/Screenshot3.png) ![screen-shot of all submissions](screenshot4.png)
 
 You can further filter your data according to one of the attributes within the form to include or exclude one value - e.g. if you have a question for Surveyor Name, you can filter on this to download a single surveyor's data.
 
-![screen-shot of attribute filters](/Screenshot4.png, "Use attribute filters to refine the list of submissions")
+![screen-shot of attribute filters](/Screenshot4.png)
 
 By default, data is loaded as lat/long (EPSG:4326 Projection) but you can select a different Projection for the layer to fit with your location (e.g. OSGB grid). You can also download data as CSV. All geometry data are saved in XYZM format with the M variable denoting the accuracy of each point or vertex.
 
-![screen-shot of temporary layer](/Screenshot5.png, "submissions / repeats are loaded as temporary vector layers")
+![screen-shot of temporary layer](/Screenshot5.png)
 
 **NOTE**: By default, QuODK only includes features with spatial data (point / line / polygon) so that they can be displayed in QGIS, but if you have some records that are missing or have no location data you can choose to include them (check box) and manually add relevant spatial data. 
 
@@ -80,23 +80,23 @@ After you have selected the data you can download related media attachments to a
 ## Downloading Entities
 If the selected project includes any Entity Lists you have the option to download New or Updated entities (within your date range or all).
 
-![screen-shot of entities](/Screenshot6.png, "Download of new or updated entities")
+![screen-shot of entities](/Screenshot6.png)
 
 # Entity Management
 If you need to generate an Entity List from a QGIS layer, or edit existing Entities in QGIS (e.g. adjust the geometry or other attributes), QuODK can be used to prepare a CSV file that can be uploaded to ODK Central Server. This is a relatively complex concept and you are well advised to become familiar with Entities before using QuODK for this purpose - for example: https://docs.getodk.org/entities-quick-reference/
 
-![screen-shot of creating entity list](/Screenshot7.png, "Preparing an Entity List with QuODK")
+![screen-shot of creating entity list](/Screenshot7.png)
 
 You can export QGIS layers (point, line or polygon, or even those without geometry) with any attributes within that layer. **NOTE**: make sure your geometry is 'single part' - each entity needs to have its own geometry and multipart geometries cannot be handled.
 
 
 QuODK will generate a UUID field or you can choose an existing UUID (useful if you want to update existing entities or keep a clear link between QGIS data and Entity lists or if you are updating entities). This also means you could include additional fields that control the format of the entity on the map widgets (e.g. colour, marker or line width)
 
-![screen-shot of entity list preview](/Screenshot10.png, "Preview Entity List")
+![screen-shot of entity list preview](/Screenshot10.png)
 
 However, upload of new entities or modification of existing entities requires additional privileges in Central and could potentially affect data collection / data integrity. For this reason (and because it is hard to anticipate every scenario for adapting entity lists), you cannot update Entities directly from QuODK. There is an intermediary step that needs to be done with pyODK (please see https://getodk.github.io/pyodk) - so you need to know how to drive pyODK!
 
-![screen-shot of pyODK recipe](/Screenshot11.png, "a simple pyODK recipe")
+![screen-shot of pyODK recipe](/Screenshot11.png)
 
  QuODK will also generate the basis of a pyODK script for you to copy and paste (e.g. into Jupyter Lab). You can adapt it to create, update, merge or delete entities. The CSV file includes the **\__id** column to identify the UUID on ODK Central
 
