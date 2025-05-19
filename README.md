@@ -58,7 +58,8 @@ Once you connect to your server you will get a list of ODK projects that you are
 
 Use the date filters to restrict the scope of the download from the server (particularly useful if you have a slow connection or large dataset). You can optionally ignore dates - but be aware that this downloads ALL submissions for the given form or repeat. **NOTE** ODK Central stores submissions in UTC time (equivalent to GMT). QuODK has a simple internationalisation feature to account for your time zone if required - due to Python / Windows inconsistencies, the method used might fail around the time of clocks changing - please be aware of this if you are trying to download submissions on a daily basis around this time of year. In all other situations it would probably be cumbersome to include an hourly option for the date filter. 
 
-![screen-shot of date filters](/Screenshot3.png) ![screen-shot of all submissions](screenshot4.png)
+![screen-shot of date filters](/Screenshot3.png) 
+![screen-shot of all submissions](screenshot4.png)
 
 You can further filter your data according to one of the attributes within the form to include or exclude one value - e.g. if you have a question for Surveyor Name, you can filter on this to download a single surveyor's data.
 
