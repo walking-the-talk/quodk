@@ -1,1 +1,0 @@
-odk_url|https://odk.walking-the-talk.co.uk;odk_username|odk@walking-the-talk.co.uk;store_pass|True;odk_pass|Exile.zapped.beanbag
