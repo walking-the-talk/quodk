@@ -7,11 +7,11 @@
 name=QuODK
 qgisMinimumVersion=3.30
 description=A bridge between ODK Central data and QGIS for loading ODK submissions and managing entities
-version=1.2
+version=1.3
 author=Walking-the-Talk
 email=chris.york@walking-the-talk.co.uk
 
-about=QuODK plug-in uses the ODK Central API to load data to QGIS as well as download attachments from the server. Since 1.2 allows download of Entities as layers  and Entity management (for use with pyODK to create update and merge Entity Lists)
+about=QuODK plug-in uses the ODK Central API to load submissions to QGIS as well as download attachments from the server. Since 1.2 allows download of Entities as layers and Entity management (for use with pyODK to create, update and merge Entity Lists)
 
 tracker=http://github.com/walking-the-talk/quodk/issues
 repository=http://github.com/walking-the-talk/quodk
@@ -21,7 +21,7 @@ repository=http://github.com/walking-the-talk/quodk
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
- changelog= 1.2: Entity management; minor enhancements; bug fixes 1.1: add include / exclude to the filter; minor code cleansing
+ changelog= 1.3: Enhanced entity management and automation 1.2: Entity management; minor enhancements; bug fixes 1.1: add include / exclude to the filter; minor code cleansing
 
 # Tags are comma separated with spaces allowed
 tags=python, odk, api
@@ -30,7 +30,7 @@ homepage=http://github.com/walking-the-talk/quodk
 category=Plugins
 icon=icon.png
 # experimental flag
-experimental=True
+experimental=False
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False

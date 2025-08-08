@@ -8,7 +8,7 @@
                               -------------------
         begin                : 2024-03-30
         git sha              : $Format:%H$
-        copyright            : (C) 2024 by Walking-the-Talk
+        copyright            : (C) 2024-2025 by Walking-the-Talk
         email                : chris.york@walking-the-talk.co.uk
  ***************************************************************************/
 
@@ -255,6 +255,7 @@ class QuODK:
         self.dlg.ODK_connect_3.clicked.connect(self.connectODK)
         self.dlg.quodk_tab.currentChanged.connect(self.tabChanged)
         self.dlg.layer_to_Elist.activated.connect(self.layer_to_entity_list)
+        self.dlg.dataset_2.activated.connect(self.entity_list_properties)
         self.dlg.Elist_name.editingFinished.connect(self.check_list_exists)
         self.dlg.Elist_name.textEdited.connect(self.reset_msg)
         self.dlg.Elist_label.activated.connect(self.update_properties_list)
@@ -265,16 +266,17 @@ class QuODK:
         self.dlg.selected_features.toggled.connect(self.use_selected)
         self.dlg.pyODK_code.resize(0,0)
         self.dlg.Elist_properties.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        # self.pyodk_radio = QButtonGroup()
-        # self.pyodk_radio.addButton(self.dlg.radio_new_code,1)
-        # self.pyodk_radio.addButton(self.dlg.radio_merge_code,2)
-        # self.pyodk_radio.addButton(self.dlg.radio_update_code,3)
-        # self.pyodk_radio.addButton(self.dlg.radio_delete_code,4)
-        # self.pyodk_radio.setExclusive(True)
-        # self.pyodk_radio.buttonClicked.connect(self.pyodk_buttons)
+        self.pyodk_radio = QButtonGroup()
+        self.pyodk_radio.addButton(self.dlg.radio_new_code,1)
+        self.pyodk_radio.addButton(self.dlg.radio_append_code,2)
+        self.pyodk_radio.addButton(self.dlg.radio_update_code,3)
+        self.pyodk_radio.addButton(self.dlg.radio_delete_code,4)
+        self.pyodk_radio.addButton(self.dlg.radio_merge_code,5)
+        self.pyodk_radio.setExclusive(True)
+        self.pyodk_radio.buttonClicked.connect(self.pyodk_buttons)
         #self.dlg.load_entity_list_to_canvas.clicked.connect(self.load_entity_list_to_canvas)
         #self.dlg.load_entity_list_to_canvas.setEnabled(False)
-        #self.dlg.save_config.clicked.connect(self.save_entity_config)
+        self.dlg.save_config.clicked.connect(self.save_entity_config)
         
         self.dlg.closeWindow_2.clicked.connect(self.dlg.reject) # entities tab
 
@@ -288,16 +290,21 @@ class QuODK:
         self.dlg.show()
         self.dlg.save_config.hide() # not ready
         self.dlg.load_entity_list_to_canvas.hide() # not ready
-        #pyODK scripts not ready
+        #pyODK script buttons
         self.dlg.radio_new_code.hide()
-        self.dlg.radio_merge_code.hide()
+        self.dlg.radio_append_code.hide()
         self.dlg.radio_update_code.hide()
         self.dlg.radio_delete_code.hide()
         self.dlg.label_radio_group.hide()
+        self.dlg.radio_merge_code.hide()
+        self.dlg.e_prop_label.hide()
+        self.headFont = QFont()
+        self.underScoreColumns = ["marker_color","marker_symbol","stroke_width", "stroke_opacity","marker_size"]
         
         self.get_logins()
         self.populateLayers()
         self.onDateChanged()   
+        self.existing_lists = ''
 
         # Run the dialog event loop
         result = self.dlg.exec_()
@@ -356,11 +363,12 @@ class QuODK:
         self.tr_filterExclude = "in/out"
         
         #Entities
-        self.tr_dataset = "-Select Dataset-"
+        self.tr_dataset = "-Select Entity List-"
         self.tr_entities_found = "Number of entities found: "
         self.tr_no_datasets = " No datasets on Central "
         self.tr_selectdataset = "-Select Entity List-"
         self.tr_entitystatus = ["-Select status-","New","Updated"]
+        self.tr_empty_list = "This list may be empty!"
         self.tr_multipart = "This layer has multipart geometry which cannot be converted to Entities - please convert to singlepart or choose a different layer"
         self.tr_list_exists = "This list name already exists make sure you have the correct properties selected to match. PyODK script will be 'merge' to add / update entities in this list, or use 'update' to complex operations"
         self.tr_similar_list_exists = "There is a similar list (upper or lower case) - you can't use this name with the current project in Central. Please rename or use a different project."
@@ -381,7 +389,10 @@ class QuODK:
         self.tr_label_includes_null = "This field has NULL values which cannot be used for labels - try selecting valid features or change the data"
         self.tr_select_csv = "Although you can generate a script for pyODK please export the CSV so that this variable can be added to the script"
         self.tr_same_fields = "You can't use the same field for both label and uuid"
-        self.tr_no_uuid = 'You must specify a valid UUID column that matches the Entity list in order to be able to delete entities!'
+        self.tr_no_uuid = "You must specify a valid UUID column that matches the Entity list in order to be able to delete entities!"
+        self.tr_not_all_properties_selected = "You have not selected all the properties that exist on the Central version of this Entity List. If you are using MERGE you need to specify the key combinations. Otherwise updating or appending to this List could fail."
+        self.tr_mind_the_underscore = 'The following columns may have been changed when importing from Central:  '
+        self.tr_mind_the_underscore2 = '\n Check whether need to change the _ to a - for the import to work as expected.'
 
         self.dlg.quodk_tab.setTabText(0,'Download Submissions and Entities')
         self.dlg.quodk_tab.setTabText(1,'Entity management')
@@ -407,6 +418,7 @@ class QuODK:
 
         self.dlg.msg2.setText("")
         self.dlg.msg2.setStyleSheet("color: black; background: none")
+        return
 
     # ====================================================================================================    
     # Get credentials from file - Potential to store password - PLAIN TEXT!!!!        
@@ -681,7 +693,7 @@ class QuODK:
                 
                 if self.keyLevel in ('KEY','PARENT_KEY'):
                     header = header.replace('__id','KEY') #submission / repeat id
-                elif self.keyLevel == 'ENTITY_KEY':
+                elif self.keyLevel == 'ENTITY_KEY': #for entities
                     header = header.replace('__id','ENTITY_KEY') #entity id
                     header = header.replace('geometry','entity_geom') # collect entity geometry field - change the name to avoid conflict with QGIS
                     if header == 'entity_geom':
@@ -770,7 +782,9 @@ class QuODK:
                 self.df_repeat = self.df_repeat[self.df_repeat[self.keyLevel].isin(self.keyID)]
                 #print(self.keyLevel, self.keyID,self.df_repeat.head())
                 self.updateTable(self.df_repeat)    #load the dataframe to the Qtable
- 
+                self.Check_ColumnName(self.df_repeat)
+                #if self.underScoreMessage:
+                #    self.dlg.msg.append(self.underScoreMessage) 
             self.dlg.Attachments.setEnabled(True)
             self.dlg.ignore_nogeom.setEnabled(True)
             self.dlg.remove_groups.setEnabled(True)
@@ -874,17 +888,24 @@ class QuODK:
             self.dlg.Attachments.setEnabled(False)            
 
     # ====================================================================================================
+   
     # update dataTable after combo box selections
     def updateTable(self, df_table):
         self.dlg.dataTable.clear()
         if df_table.shape[0] == 0:
-            pass
+            return
         else:
             headings = list(df_table)
             
             self.dlg.dataTable.setRowCount(df_table.shape[0])
             self.dlg.dataTable.setColumnCount(df_table.shape[1])
-            self.dlg.dataTable.setHorizontalHeaderLabels(headings)        
+            self.dlg.dataTable.setHorizontalHeaderLabels(headings)
+            i=0
+            self.headFont.setBold(True)
+            for heading in headings:
+                if '_' in heading and '__' not in heading and 'base_version' not in heading:  
+                    self.dlg.dataTable.horizontalHeaderItem(i).setFont(headFont)
+                i +=1
             self.dlg.dataTable.resizeColumnsToContents()
             # convert dataframe to array before populating table
             df_array = df_table.values
@@ -999,7 +1020,7 @@ class QuODK:
 
             geomType = self.dlg.odk_geometry.currentText()
             if geomType == self.tr_table_only:
-                layerGeom = "NoGeometry"
+                layerGeom = "NOGEOMETRY"
                 geomName = ""
                 geomCol = "geom_from_ODK"
             else:
@@ -1020,98 +1041,103 @@ class QuODK:
             self.construct_geometry(df_layer,layerGeom, geomName, geomCol)
             if self.keyLevel == "ENTITY_KEY":
                 layerGeom = self.entityGeom
-
+            #print(layerGeom)
             # Create QgsVectorLayer with appropriate geometry (or just a table if there is no geometry)
+            for geoms in layerGeom.split():
+                df_splitlayer = df_layer[df_layer['geom_from_ODK'].str.contains(geoms.upper())]
+                df_splitlayer.index = range(len(df_splitlayer.index))
 
-            crs = self.dlg.crs.crs()
-            projection = QgsCoordinateReferenceSystem.authid(crs)
-            LayerType = str(str(layerGeom)+"ZM?crs=" + str(projection))
-            temp = QgsVectorLayer(LayerType,LayerName,"memory")
-            temp_data = temp.dataProvider()
-            temp.startEditing()
-            # Create  fields in dataProvider - QMetaType type according to dtype in dataframe [updated from QVariant which was depreciated in 3.38]
-            headers = list(df_layer)
-            col_number = 0
-            for header in headers : 
-                #print(header)
-                if header == 'geom_from_ODK' or header == 'geometry': #don't add the WKT column - it is redundant (and may not be in the correct CRS so could cause confusion) and ignore any column called geometry (ODK source likely csv or entity) as it causes trouble with QGIS
-                    pass
+                crs = self.dlg.crs.crs()
+                projection = QgsCoordinateReferenceSystem.authid(crs)
+                if geoms == "NOGEOMETRY":
+                    LayerType = str("POINTZM?crs=" + str(projection))
+                    LayerName +='_NoGeom'
                 else:
-                    datatype= df_layer[header].dtype
+                    LayerType = str(str(geoms.upper())+"ZM?crs=" + str(projection))
+                temp = QgsVectorLayer(LayerType,LayerName,"memory")
+                temp_data = temp.dataProvider()
+                temp.startEditing()
+                # Create  fields in dataProvider - QMetaType type according to dtype in dataframe [updated from QVariant which was depreciated in 3.38]
+                headers = list(df_splitlayer)
+                ignoregeom = ["geom_from_ODK", "entity_geom", "geometry"]
+                col_number = 0
+                for header in headers : 
+                    #print(header)
+                    if header not in ignoregeom:  #don't add the WKT column - it is redundant (and may not be in the correct CRS so could cause confusion) and ignore any column called geometry (ODK source likely csv or entity) as it causes trouble with QGIS
 
-                    #ensure the fields are the correct QGIS type to receive the data (string, int or double)
-                    if datatype == 'object':
-                        temp_data.addAttributes([QgsField(header,QMetaType.QString)])
-                    if datatype == 'int64':
-                        temp_data.addAttributes([QgsField(header,QMetaType.Int)])
-                    elif datatype == 'float64':
-                        temp_data.addAttributes([QgsField(header,QMetaType.Double, 'double', 20, 3)]) #length 20, precision 3
-                    else:
-                        temp_data.addAttributes([QgsField(header,QMetaType.QString)])
-                col_number+=1   
-            temp.updateFields()
+                        datatype= df_splitlayer[header].dtype
 
-            # Populate the layer by iterating through the dataframe
-            #if self.dlg.ignore_nogeom.isChecked(): #revert to all rows including where geometry is null
-            #    df_layer = df_layer_all
-            headers = list(df_layer) 
-
-            # Add features with the given geometry
-
-            for i,row in df_layer.iterrows():
-                if str(layerGeom) == "NoGeometry": 
-                    geom =""
-                else:
-                    geom = df_layer.loc[i, 'geom_from_ODK']
-                #print(geom)
-                f = QgsFeature()
-                #this allows transformation to selected CRS
-                base_geom = QgsGeometry.fromWkt(geom)
-                sourceCrs = QgsCoordinateReferenceSystem("EPSG:4326")
-                destCrs = crs
-                tr = QgsCoordinateTransform(sourceCrs, destCrs, QgsProject.instance())
-                if str(layerGeom) == "NoGeometry": 
-                    pass
-                else:
-                    base_geom.transform(tr)
-                #print(base_geom)
-                f.setGeometry(base_geom)
-                temp_data.addFeatures([f])
-                temp.commitChanges()
+                        #ensure the fields are the correct QGIS type to receive the data (string, int or double)
+                        if datatype == 'object':
+                            temp_data.addAttributes([QgsField(header,QMetaType.QString)])
+                        if datatype == 'int64':
+                            temp_data.addAttributes([QgsField(header,QMetaType.Int)])
+                        elif datatype == 'float64':
+                            temp_data.addAttributes([QgsField(header,QMetaType.Double, 'double', 20, 3)]) #length 20, precision 3
+                        else:
+                            temp_data.addAttributes([QgsField(header,QMetaType.QString)])
+                    col_number+=1   
                 temp.updateFields()
-                temp.updateExtents()
-            
-            # Populate the attribute table for each feature
-            features = temp.getFeatures()
-            count=0
-            headers = list(df_layer)
-            for feature in features:
-                for header in headers:
-                    if header == 'geom_from_ODK'  or header == 'geometry': #don't include the WKT column - it is redundant and ignore the imported geometry column
+
+                # Populate the layer by iterating through the dataframe
+                #if self.dlg.ignore_nogeom.isChecked(): #revert to all rows including where geometry is null
+                #    df_splitlayer = df_splitlayer_all
+                headers = list(df_splitlayer) 
+
+                # Add features with the given geometry
+
+                for i,row in df_splitlayer.iterrows():
+                    if str(geoms) == "NOGEOMETRY": 
+                        geom =""
+                    else:
+                        geom = df_splitlayer.loc[i, 'geom_from_ODK']
+                    #print(geom)
+                    f = QgsFeature()
+                    #this allows transformation to selected CRS
+                    base_geom = QgsGeometry.fromWkt(geom)
+                    sourceCrs = QgsCoordinateReferenceSystem("EPSG:4326")
+                    destCrs = crs
+                    tr = QgsCoordinateTransform(sourceCrs, destCrs, QgsProject.instance())
+                    if str(geoms) == "NOGEOMETRY": 
                         pass
                     else:
-                        with edit(temp):
-                            datatype= df_layer[header].dtype
-                            #print(count,header, datatype)
-                            #insert feature with the appropriate data type
-                            attributeValue = df_layer.loc[count,header]
-                            if attributeValue == None:
-                                pass
-                            else:
-                                if datatype == 'object':
-                                    attributeValue = str(attributeValue)
+                        base_geom.transform(tr)
+                    #print(base_geom)
+                    f.setGeometry(base_geom)
+                    temp_data.addFeatures([f])
+                    temp.commitChanges()
+                    temp.updateFields()
+                    temp.updateExtents()
+                
+                # Populate the attribute table for each feature
+                features = temp.getFeatures()
+                count=0
+                headers = list(df_splitlayer)
+                for feature in features:
+                    for header in headers:
+                        if header not in ignoregeom: #don't include the WKT column - it is redundant and ignore the imported geometry column
+                            with edit(temp):
+                                datatype= df_splitlayer[header].dtype
+                                #print(count,header, datatype)
+                                #insert feature with the appropriate data type
+                                attributeValue = df_splitlayer.loc[count,header]
+                                if attributeValue == None:
+                                    pass
                                 else:
-                                    if isnan(attributeValue): # change nan to None / Null
-                                        attributeValue = None
+                                    if datatype == 'object':
+                                        attributeValue = str(attributeValue)
                                     else:
-                                        attributeValue = float(attributeValue)
-                            #print(attributeValue,datatype)
-                            feature[header] = attributeValue
-                            temp.updateFeature(feature)
-                count+=1
-            temp.commitChanges()
+                                        if isnan(attributeValue): # change nan to None / Null
+                                            attributeValue = None
+                                        else:
+                                            attributeValue = float(attributeValue)
+                                #print(attributeValue,datatype)
+                                feature[header] = attributeValue
+                                temp.updateFeature(feature)
+                    count+=1
+                temp.commitChanges()
 
-            QgsProject.instance().addMapLayer(temp)   
+                QgsProject.instance().addMapLayer(temp)   
             self.dlg.msg.setText(self.tr_layer_added + projection)
             self.dlg.msg.setStyleSheet("background: DarkSeaGreen")
             self.dlg.progressBar.setRange(0,100)
@@ -1209,7 +1235,7 @@ class QuODK:
     def load_csv_to_canvas(self, df_layer, geomType,csvFilename):
         projection = "EPSG:4326"            
         if geomType == self.tr_table_only:
-            layerGeom = "NoGeometry"
+            layerGeom = "NOGEOMETRY"
             projection = "table only - no projection"
             #geomCol = "geom_from_ODK"
             uri = 'file:///{}?delimiter=,'.format(csvFilename)
@@ -1250,8 +1276,8 @@ class QuODK:
                     self.WKT = ""
                 else:
                     #Convert to table only           
-                    if str(layerGeom) == "NoGeometry": 
-                        self.WKT = "NoGeometry"
+                    if str(layerGeom) == "NOGEOMETRY": 
+                        self.WKT = "NOGEOMETRY"
                     
                     #Convert to Point WKT 
                     if str(layerGeom) == "Point": 
@@ -1380,6 +1406,7 @@ class QuODK:
                 filter_url = (dataset_url,str(self.dlg.dataset.currentText()),".svc/Entities")
             else:
                 filter_url = (dataset_url,str(self.dlg.dataset.currentText()),".svc/Entities?$filter=",self.filterEntityS," and ",self.filterEntityE)
+            #print(filter_url)
             self.df_entities = self.get_Response(filter_url)
             #if self.df_entities:
             entitiesTotal = self.df_entities.shape[0]
@@ -1403,33 +1430,47 @@ class QuODK:
 
     # ====================================================================================================    
     # for adding geometry column if stored in the Entity properties - write as 4D WKT format (e.g. POINTZM / LINESTRINGZM / POLYGONZM)
+    # v1.3 - generate layers for each geomtype if entity has mixed geometries
     
     def construct_entity_geometry (self,df_layer,geomCol):
+        geomTypes = ''
         for i,iData in df_layer.iterrows():
+
             iValues = df_layer.loc[i, geomCol]
-            vertices = iValues.split("; ")
-            c=""
-            if len(vertices) == 1:
-                geomType = "POINT"
-            elif vertices[0] == vertices[-1]:
-                geomType = "POLYGON"
+            if iValues:
+                #print('Raw: ', iValues)
+                vertices = iValues.split(";")
+                c=""
+
+                if len(vertices) == 1:
+                    geomType = "POINT"
+                elif vertices[0] == vertices[-1]:
+                    geomType = "POLYGON"
+                else:
+                    geomType = "LINESTRING"
+                for a in vertices:
+                    a=a.lstrip(' ') #remove any leading spaces if the format is '; vertex' rather than ';vertex'
+                    #print('vertex: ', a)
+                    coords = a.split(" ")
+                    #print('coords: ',coords)
+                    b = coords[1] + " " + coords[0] + " " + coords[2] + " " + coords[3] # convert lat lon alt acc; to xyzm
+                    c = c + ", " + b
+                XYZ = c[1:]
+                #print ('XYZ: ',XYZ)
+                self.WKT = (geomType + "ZM ((" + XYZ +"))")
+                 #Add geometry to dataframe
+                 #differentiate between downloaded Entity list and exported QGIS entity list
+                 
+                df_layer.loc[i, 'geom_from_ODK'] = str(self.WKT)
+                #print('WKT: ',self.WKT)
             else:
-                geomType = "LINESTRING"
-            for a in vertices:
-                #print('vertex: ', a)
-                coords = a.split(" ")
-                #print('coords: ',coords)
-                b = coords[1] + " " + coords[0] + " " + coords[2] + " " + coords[3] # convert lat lon alt acc; to xyzm
-                c = c + ", " + b
-            XYZ = c[1:]
-            #print ('XYZ: ',XYZ)
-            self.WKT = (geomType + "ZM ((" + XYZ +"))")
-             #Add geometry to dataframe
-             #differentiate between downloaded Entity list and exported QGIS entity list
-             
-            df_layer.loc[i, 'geom_from_ODK'] = str(self.WKT)
-            #print('WKT: ',self.WKT)
-        self.entityGeom = geomType
+                geomType = "NOGEOMETRY"
+                df_layer.loc[i, 'geom_from_ODK'] = 'NOGEOMETRY'
+            #print(geomType)
+            if geomType not in geomTypes:
+                geomTypes += str(geomType + ' ')
+        self.entityGeom = geomTypes
+        #print(self.entityGeom)
         return df_layer
         
     # ==================================================================================================== 
@@ -1456,9 +1497,11 @@ class QuODK:
             self.dlg.msg2.setText(self.tr_no_qgis_project)
         
     def show_existing_lists(self): # fetch existing Entity List names
+        self.reset_msg
         self.dlg.existing_lists.clear()
+        self.dlg.dataset_2.clear()
         self.existing_lists = []
-
+        self.dlg.dataset_2.addItem(str(self.tr_dataset))
         self.selected_projectID_entity = str(self.dlg.projectID_entity.currentText()).split('|')[0]
         global dataset_url
         dataset_url = (str(odk_url),"/v1/projects/",str(self.selected_projectID_entity),"/datasets/")
@@ -1469,40 +1512,112 @@ class QuODK:
 
         if dataset_response.status_code == 200:
             for ds in dataset_response.json():
+                self.dlg.dataset_2.addItem(str(ds["name"]))
                 self.existing_lists.append(ds["name"])
             if len(self.existing_lists) >0:
                 ordered = sorted(self.existing_lists)
                 li = ("\n".join(ordered))
                 self.dlg.existing_lists.setText(li)
+                self.dlg.dataset_2.setEnabled(True)
             else:
                 self.dlg.existing_lists.setText(self.tr_no_datasets)  
 
-        #advisory to see if a similar name exists and whether to create new list or merge existing
+        #advisory to see if a similar name exists and whether to create new list or update existing
     def check_list_exists(self):
         self.list_type = "create"
         self.dlg.radio_new_code.setChecked(True)
-        self.dlg.Elist_name.setStyleSheet("background: none")
+        #self.dlg.Elist_name.setStyleSheet("background: none")
         try:
             l = [item.lower() for item in self.existing_lists]
             l_name = str(self.dlg.Elist_name.text()).lower()
-            if self.existing_lists and self.dlg.Elist_name.text() in self.existing_lists:
-                self.dlg.msg2.setText(self.tr_list_exists)
-                self.dlg.msg2.setStyleSheet("background: orange")
-                self.list_type="merge"
-                self.pyodk_radio.setId(2)
+            if self.dlg.Elist_name.text() == self.dlg.dataset_2.currentText():
+                self.list_type="update"
+                self.dlg.radio_new_code.setChecked(False)
+                self.dlg.radio_update_code.setChecked(True)
+                return
             elif self.existing_lists and l_name in l:
-                self.dlg.msg2.setText(self.tr_similar_list_exists)
+                self.dlg.msg2.setText(str(self.dlg.msg2.text()) + self.tr_similar_list_exists)
                 self.dlg.msg2.setStyleSheet("color: #ffffff; background: red")
                 self.list_type="duplicate"
                 #print(l_name, l)
+            else:
+                self.reset_msg()
                 
         except:    
             self.dlg.msg2.setText(self.tr_not_connected)    
 
+    def entity_list_properties(self):
+        
+        if self.dlg.dataset_2.currentIndex() > 0:
+        
+            dataset_properties_url = (str(dataset_url),str(self.dlg.dataset_2.currentText()),".svc/Entities?$top=1")
+            dataset_properties_url = "".join(dataset_properties_url)
+            self.dlg.progressBar.setRange(0,0)
+            self.dlg.progressBar.setTextVisible(False)
+            
+            dataset_properties_response = requests.get(str(dataset_properties_url), headers = {"Authorization": "Bearer " + session_token},)
+            #print(dataset_properties_url, dataset_properties_response.status_code)
+            if dataset_properties_response.status_code == 200:
+                dsjson=dataset_properties_response.json()['value']
+                e_prop_list = pd.json_normalize(dsjson)
+                self.e_prop = list(e_prop_list)
+                self.dlg.existing_lists.clear()
+                self.existing_list_props = []
+                for field in self.e_prop:
+                    if "__" not in field:  
+                        self.existing_list_props.append(field)
+                if len(self.existing_list_props) >0:
+                    li = ("\n".join(self.existing_list_props))
+                    self.dlg.existing_lists.setText(li)
+                    self.dlg.existing_lists.setStyleSheet("background: DarkSeaGreen")
+                    self.dlg.e_prop_label.show()
+                    self.reset_msg()
+                else:
+                    self.dlg.msg2.setText(self.tr_empty_list)
+                #print(dsjson, entity_prop_list)
+                #print(self.e_prop)
+                self.dlg.Elist_name.setText(self.dlg.dataset_2.currentText())
+                self.check_list_exists()
+
+
+            else:
+                self.dlg.existing_lists.setText(self.tr_no_datasets)
+
+    def entity_match_central(self):
+        #check that the properties from the QGIS layer match those of the Central entity (if selected)
+        #iterate QGIS layer columns and check they are the same as Central, and in the same order.
+        #potentially reorder the columns from QGIS layer to match Central
+        if self.dlg.Elist_name.text() == self.dlg.dataset_2.currentText() and self.dlg.Elist_name.text()!='':
+            for i in range(self.dlg.Elist_properties.count()):
+                x = self.dlg.Elist_properties.itemText(i)
+                if x in self.e_prop:
+                    self.dlg.Elist_properties.setItemCheckState(i,2) 
+            self.useEntity = True
+            #for field in self.dlg.Elist_properties.currentData():
+                #if field is in self.existing_list_props()
+                #self.dlg.Elist_properties.setChecked(field)
+               # print(field)
+            # matched = 0
+            # for prop in self.e_prop:
+                # #if prop == 'label' or prop == 'geometry': #catch additional properties
+                # #    matched += 1
+                # if prop in self.dlg.Elist_properties.checkedItems():
+                    # matched += 1   
+            # #print(matched)
+            # if matched == len(self.dlg.Elist_properties.checkedItems()): #same fields selected as in Entity
+                # self.useEntity = True
+            # else:
+                # self.useEntity = False
+                # self.dlg.msg2.setText(self.tr_not_all_properties_selected)
+                # self.dlg.existing_lists.setStyleSheet("background: orange")
+        else:
+            self.useEntity = False
+
     def layer_to_entity_list(self): #on select layer combo box
+        self.show_list_props
+        self.reset_msg()
         if self.dlg.layer_to_Elist.currentIndex()>0:
             self.df_export_entities = pd.DataFrame()
-            self.reset_msg()
             self.dlg.pyODK_code.resize(0,0)
             self.dlg.Entity_table.resize(801,215)
             self.dlg.Entity_table.clear()
@@ -1535,7 +1650,7 @@ class QuODK:
                 self.dlg.QGIS_KEY.clear()                
                 return
             message += ' ('+geomtype + ')'
-            if geomtype == "NoGeometry":
+            if geomtype == "NOGEOMETRY":
                 message += '. ' + self.tr_no_geom_layer
             
             self.dlg.msg2.setText(message)
@@ -1543,11 +1658,24 @@ class QuODK:
 
             self.dlg.Elist_label.setLayer(self.Elist_layer)
             self.dlg.Elist_label.setAllowEmptyFieldName(True)
-            self.dlg.Elist_label.setCurrentIndex(0)
+            field_list = self.Elist_layer.fields().names()
+            #has_label = "label"
+            if "label" in field_list:
+                self.dlg.Elist_label.setCurrentText("label")
+            else:
+                self.dlg.Elist_label.setCurrentIndex(0)
             
             self.dlg.QGIS_KEY.setLayer(self.Elist_layer)
             self.dlg.QGIS_KEY.setAllowEmptyFieldName(True)
-            self.dlg.QGIS_KEY.setCurrentIndex(0)
+            
+
+            
+            if "ENTITY_KEY" in field_list:
+                self.dlg.QGIS_KEY.setCurrentText("ENTITY_KEY")
+            else:
+                self.dlg.QGIS_KEY.setCurrentIndex(0)
+                
+            self.update_properties_list()
             self.update_properties_list()
 #        else:
 #            self.dlg.msg2.setText(self.tr_no_qgis_project)
@@ -1583,6 +1711,7 @@ class QuODK:
             self.dlg.Elist_label.setStyleSheet("background: red")
                  
     def check_is_UUID (self):
+        self.reset_msg()
         if self.dlg.QGIS_KEY.currentText():
             try:
                 get_feature = self.Elist_layer.getFeature(1)
@@ -1628,15 +1757,29 @@ class QuODK:
             if len(self.df_export_entities.index) > 0:
                 self.precheck_csv()
 
+    def show_list_props(self):
+        if self.existing_lists:
+            if self.dlg.Elist_name.text() == self.dlg.dataset_2.currentText():
+                self.dlg.existing_lists.setStyleSheet("background: DarkSeaGreen")
+                self.dlg.e_prop_label.show()
+            else:
+                self.dlg.existing_lists.setStyleSheet("background: none")
+                if len(self.existing_lists) >0:
+                    ordered = sorted(self.existing_lists)
+                    li = ("\n".join(ordered))
+                    self.dlg.existing_lists.setText(li)
+                    self.dlg.e_prop_label.hide()
+        return
+
     # Multi-select combo for the fields to include within the entity list        
     def update_properties_list(self):
-
-
+        self.reset_msg()
+        self.show_list_props()
         transfer = ""
         if self.dlg.Elist_label.currentIndex() == self.dlg.QGIS_KEY.currentIndex() and self.dlg.Elist_label.currentIndex() > 0:
             self.dlg.msg2.setText(self.tr_same_fields)
             return
-        if len(self.dlg.Elist_properties.checkedItems())>0:
+        if len(self.dlg.Elist_properties.checkedItems())>0 and self.dlg.Elist_name.text() != self.dlg.dataset_2.currentText():
             transfer = self.dlg.Elist_properties.checkedItems() # remember already checked items if changing other values
         self.dlg.Elist_properties.clear()
         field_list = self.Elist_layer.fields().names()
@@ -1650,9 +1793,16 @@ class QuODK:
             if str(self.dlg.QGIS_KEY.currentText()) in transfer:
                 transfer.remove(str(self.dlg.QGIS_KEY.currentText()))
         #print(field_list, "label: ",self.dlg.Elist_label.currentText(),"; UUID: ",self.dlg.QGIS_KEY.currentText())
+        try:
+            field_list.remove("geom_from_ODK")
+            field_list.remove("entity_geom")
+        except:
+            pass
         for field in field_list:
-            self.dlg.Elist_properties.addItem(field)
+            if "__" not in field:         #exclude ODK Central system values if they exist (e.g. from imported entities)
+                self.dlg.Elist_properties.addItem(field)
 
+        self.entity_match_central()
         try: # soft error if one of the selected items is now name or label
             if transfer:
                 self.dlg.Elist_properties.setCheckedItems(transfer)
@@ -1665,6 +1815,7 @@ class QuODK:
             self.reset_msg()
             eid = ""
             if self.dlg.Elist_label.currentIndex() > 0:
+                self.entity_match_central()
                 if self.dlg.Elist_properties.currentText(): #check that at least one additional property has been selected
                     label = str(self.dlg.Elist_label.currentText())
                     if self.dlg.QGIS_KEY.currentIndex()>0:
@@ -1734,7 +1885,13 @@ class QuODK:
                         self.dlg.msg2.setText(str(nogeom_row) + ' / ' +str(len(row_list)) + self.tr_nogeom_row)
                     
                     #selected column list: 'label','eid', 'geometry' and base_version plus list of selected columns (also becomes the column order)
-                    selected_columns = ['__id'] + [label]  + ['geometry'] + ['base_version'] + self.dlg.Elist_properties.checkedItems()
+                    #print (self.useEntity, self.existing_list_props, self.dlg.Elist_properties.checkedItems())
+                    if self.useEntity is True:
+                        self.existing_list_props.remove('label')
+                        self.existing_list_props.remove('geometry')
+                        selected_columns = ['__id'] + [label]  + ['geometry'] + self.existing_list_props + ['base_version']
+                    else:
+                        selected_columns = ['__id'] + [label]  + ['geometry'] + self.dlg.Elist_properties.checkedItems() + ['base_version']
                     
                     exclude_columns = list(set(cols).difference(selected_columns))
                     df_excluded = self.df_create_entityList.drop(columns = exclude_columns) # remove columns that are not checked
@@ -1757,10 +1914,23 @@ class QuODK:
                         #print('dropping: ',len(df['base_version'].drop_duplicates()) , df.loc[0,'base_version'])
                         df = df.drop('base_version', axis = 1)
                     #df.replace('NULL', '',inplace=True)
+                    #replace reserved column names - OData changes - to _ when importing submissions or entities, which could break the export... The reserved names for geodata are automatically changed back if found.
+                    headers = list(df)
+                    for header in headers:
+                        self.countUnderScores = 0
+                        if header in self.underScoreColumns:
+                            newHeader = header.replace('_','-')
+                            df.rename( columns ={header: newHeader},inplace="True")
+                            self.countUnderScores += 1
+                            
                     self.updateEntityTable(df) # show the data in the table
                     self.df_export_entities = df
                     self.dlg.export_Elist_to_csv.setEnabled(True)
                     #print(self.entity_properties)
+                    self.check_list_exists()
+                    self.Check_ColumnName(self.df_export_entities)
+                    if self.underScoreMessage:
+                        self.dlg.msg2.setText(self.underScoreMessage)
                 else:
                     self.dlg.msg2.setText(self.tr_no_entity_properties)
             else:
@@ -1778,14 +1948,19 @@ class QuODK:
                     self.df_export_entities.rename(columns = {'eid': 'name'}, inplace="True")
                     self.onlycsv = True
                 if self.onlycsv is False:
+                    self.dlg.radio_new_code.show()
+                    self.dlg.radio_append_code.show()
+                    self.dlg.radio_update_code.show()
+                    self.dlg.radio_delete_code.show()
+                    self.dlg.label_radio_group.show()                    
+                    #self.dlg.radio_merge_code.show()  
                     self.pyodk_calls()
                     self.dlg.pyODK_code.setPlainText(self.pyodk_recipe)
                 self.reset_msg
                 try:
                     self.df_export_entities.to_csv(str(self.entityCsvFilename), index=False)
                     self.dlg.msg2.setText(self.tr_csv_exported + str(self.entityCsvFilename))
-                    #self.dlg.load_entity_list_to_canvas.setEnabled(True)
-                    #self.load_entity_list_to_canvas() - not working yet!
+
                 except:
                     self.dlg.msg2.setText(self.tr_file_error)
                     self.dlg.msg2.setStyleSheet("background: red")
@@ -1819,6 +1994,19 @@ class QuODK:
                 for col in range(df_table.shape[1]):
                     self.dlg.Entity_table.setItem(row, col, QTableWidgetItem(str(df_array[row,col])))
 
+    def Check_ColumnName (self,df_table): # currently OData substitutes dash (-) for underscore (_) this is a check to warn the user
+        headings = list(df_table)
+        underScored = []
+        for heading in headings:
+            if '_' in heading and '__' not in heading and 'base_version' not in heading:
+                underScored += heading +' '
+        if underScored:
+            underScoredList = "".join(underScored)
+            self.underScoreMessage = self.tr_mind_the_underscore + str(underScoredList) + self.tr_mind_the_underscore2
+        else:
+            self.underScoreMessage = ''
+        return
+
     # generate a recipe to copy into pyODK (create, merge, update or delete)
     def pyodk_calls(self):
         if not self.entityCsvFilename:
@@ -1832,46 +2020,48 @@ class QuODK:
                 self.selected_projectID_entity = '0 # Please manually change to the relevant Project ID integer'
 
 
-            self.pyodk_recipe = 'You have exported a CSV with the following properties:\nprojectId = ' + str(self.selected_projectID_entity) + '\nlistname="' + self.dlg.Elist_name.text() + '"\ncsv_path = "' + self.entityCsvFilename + '"\nentity_label_field = "label"\nentity_properties = ("' + entity_props +'")\n\nThese variables will be useful in pyODK for managing entities - the current version of QuODK does not provide a working script for your data.  HINT: Copy and paste the text above into Jupyter Lab to start constructing a script... Please visit https://getodk.github.io/pyodk/entities/ or\n https://getodk.github.io/pyodk/examples/create_entities_from_submissions/create_entities_from_submissions/ for information about creating, updating, merging or deleting entities with pyODK.\n\n'
-            # create script for pyODK (e.g. Jupyter Lab) - TODO: test all the scenarios
-            # self.pyodk_recipe = '#EXPERIMENTAL pyODK sample code exported from QuODK to '+self.list_type + ' entities\n\n#You are responsible for checking:\n#    a) that the code is correct\n#    b) you understand the complexities of managing entities - it is not possible to anticipate every scenario or workflow with these recipes - the more complex your situation the more difficult it is to cope with your requirements using these methods (offline entities, multiple forms updating the entities etc)\n#    c) that you are prepared if things go wrong (have you made a back up of your Central instance on the server before starting?) \n\nfrom pyodk.client import Client\nfrom csv import DictReader\nfrom pathlib import Path\n#Variables from QuODK\nprojectId = ' + str(self.selected_projectID_entity) + '\nlistname="' + self.dlg.Elist_name.text() + '"\ncsv_path = "' + self.entityCsvFilename + '"\nentity_label_field = "label"\nentity_properties = ("' + entity_props +'")\n'
+            # V1.3: create script for pyODK (e.g. Jupyter Lab)
+            self.pyodk_recipe = '# This pyODK script was exported from QuODK to '+self.list_type + ' entities\n\n# NOTE: [Boring warning alert!] You remain responsible for checking:\n#    a) that the code is correct\n#    b) you understand the complexities of managing entities - it is not possible to anticipate every scenario or workflow with QuODK recipes - the more complex your situation the more difficult it is to cope with your requirements using these methods (offline entities, multiple forms updating the entities etc)\n#    c) that you are prepared if things go wrong (have you made a back up / snapshot of your Central installation on the server before starting?) \n\n'
+            #deal with the potential underscore substitution
+            if self.underScoreMessage:
+                self.pyodk_recipe +='#### CAUTION: '+self.underScoreMessage + '\n Please check if any entity_properties need to be updated from the list below and you may need to edit the csv file to change the column headings.\n'
+            self.pyodk_recipe +='from pyodk.client import Client\nfrom csv import DictReader\nfrom pathlib import Path\n#Variables from QuODK\nprojectId = ' + str(self.selected_projectID_entity) + '\nlistname="' + self.dlg.Elist_name.text() + '"\ncsv_path = "' + self.entityCsvFilename + '"\nentity_label_field = "label"\nentity_properties = ("' + entity_props +'")\neid = "__id" # This is the uuid field for the entity\n'
+
             # if self.list_type == "merge":
-                # self.pyodk_recipe += 'entity_match_fields = () # Optionally select one or more of the properties above that is a unique KEY'
-            # #if self.dlg.QGIS_KEY.currentIndex() > 0:
-            # self.pyodk_recipe += '\neid = "__id"\n'
-            # # else:
-                # # self.pyodk_recipe += ')\n'
-            # self.pyodk_recipe += '\n\nwith Client(project_id=projectId) as client, open(csv_path) as csv_file:\n'
+                # self.pyodk_recipe += 'entity_match_fields = () # Optionally select one or more of the properties above to allow merging of specific attributes'
 
-            # if self.list_type == "update":
-                # self.pyodk_recipe += '#(adapted from https://forum.getodk.org/t/updating-entities-with-csv-upload/48986)\n    for row in DictReader(csv_file):\n        client.entities.update(\n                row[eid],\n                entity_list_name = listname,\n                label = row[entity_label_field],\n                row,\n                base_version=int(row[base_version])\n                )\n '  
-                # # for row in DictReader(csv_file):
-                    # # print(
-                            # # row['__id'],
-                            # # listname,
-                            # # entity_label_field,
-                            # # row,
-                            # # int(row['base_version'])
-                            # # )
-                # return self.pyodk_recipe
-            # if self.list_type == "delete":
+            self.pyodk_recipe += '\n\nwith Client(project_id=projectId) as client, open(csv_path) as csv_file:\n'
 
-                # self.pyodk_recipe += '    #You must ensure that the entity id column (__id) matches the Entity list in order to be able to delete entities!\n    for row in DictReader(csv_file):\n        client.entities.delete(\n                uuid = eid,\n                entity_list_name = listname,\n                )\n '           
-                # if self.dlg.QGIS_KEY.currentIndex() == 0:
-                    # self.dlg.msg2.setText(self.tr_no_uuid)
-                    # self.pyodk_recipe += '#CAUTION: there is no Entity id field in the CSV file that matches the Central server - this script will fail'
-                # return self.pyodk_recipe
-            # if self.list_type=="duplicate": #where the chosen list name is too similar (upper or lower case)
-                # self.pyodk_recipe +='        #CAUTION: You have chosen an Entity List name that duplicates (or is upper/lower case equivalent) to an existing List within this project with id ' + str(self.selected_projectID_entity) + '. This script may not work! The rest of this script assumes creating a new list but you may need to change the projectId or listname.'
-                # self.list_type = "create" #change the type to 'create' so that the rest of the recipe is available
-            # if self.list_type == "create":
-                # self.pyodk_recipe +='        # Create a new entity list first.\n    entity_list = client.entity_lists.create('#entity_list_name = listname)\n'
-                # #this version is used instead of [merge] so that Entity id can be defined from QGIS - 1: create list; 2: create properties; 3: create entities in loop
-                # self.pyodk_recipe +='        entity_list_name=listname\n        )\n    for prop in entity_properties:\n        client.entity_lists.add_property(name=prop, entity_list_name=listname)\n    for row in DictReader(csv_file):\n        client.entities.create(\n            label=row[entity_label_field],\n            uuid = eid,\n            data={k: str(v) for k, v in row.items() if k in entity_properties},\n            entity_list_name=listname,\n            )\n' 
-                # #return
+            if self.list_type == "update":
+                if self.dlg.Elist_name.text() == self.dlg.dataset_2.currentText():
+                    e_props = ' '.join(self.e_prop)
+                    self.pyodk_recipe += '# The entity list on Central has the following properties: ' + e_props + ' (check they are the same as the list you have saved)\n'
+                else:
+                    self.pyodk_recipe += '# Caution: you have not selected an existing list - please check that the properties match those in your csv\n'
+                self.pyodk_recipe += 'version = "base_version"\n#(adapted from https://forum.getodk.org/t/updating-entities-with-csv-upload/48986)\n    for row in DictReader(csv_file):\n        client.entities.update(\n                row[eid],\n                entity_list_name = listname,\n                label = row[entity_label_field],\n                data={k: str(v) for k, v in row.items() if k in entity_properties},\n                base_version=int(row[version])\n                #force = True #uncomment this if you want to update regardless of potential conflicts - toggle with base_version\n                )\n        print (\'Updating entity id \',row[eid])\n    print (\'Complete\')'  
+                # adapted the 'data' statement from the Forum post to allow base_version to vary within the list without it being uploaded as a property.
+                return self.pyodk_recipe
+            if self.list_type == "delete":
+
+                self.pyodk_recipe += '    for row in DictReader(csv_file):\n        client.entities.delete(\n                uuid = row[eid],\n                entity_list_name = listname,\n                )\n\n         print (\'Deleting entity id \',row[eid])\n    print (\'Complete\') '           
+                if self.dlg.QGIS_KEY.currentIndex() == 0:
+                    self.dlg.msg2.setText(self.tr_no_uuid)
+                    self.pyodk_recipe += '#CAUTION: the Entity ids in the CSV file do not match the Central server - this script will not find any Entities to delete'
+                return self.pyodk_recipe
+            if self.list_type=="duplicate": #where the chosen list name is too similar (upper or lower case)
+                self.pyodk_recipe +='        #CAUTION: You have chosen an Entity List name that duplicates (or is upper/lower case equivalent) to an existing List within this project with id ' + str(self.selected_projectID_entity) + '. This script may not work! The rest of this script assumes creating a new list but you may need to change the projectId or listname.'
+                self.list_type = "create" #change the type to 'create' so that the rest of the recipe is available even though it might fail!
+            if self.list_type == "create":
+                #this version is used instead of [merge] so that Entity id can be defined from QGIS - workflow is 1: create list; 2: create properties; 3: create entities in loop
+                self.pyodk_recipe +='        # Create a new entity list first. If you are appending to an existing list choose the append script\n    entity_list = client.entity_lists.create(entity_list_name=listname)\n    for prop in entity_properties:\n        client.entity_lists.add_property(name=prop, entity_list_name=listname)\n\n         print (\'Creating entity property: \',prop)\n'
+            if self.list_type == "append":
+                self.pyodk_recipe +='#NOTE: when appending, make sure that the properties match those in Central to avoid failure.\n\n'
+            if  self.list_type == "create" or self.list_type == "append":
+                self.pyodk_recipe +='    for row in DictReader(csv_file):\n        client.entities.create(\n            label=row[entity_label_field],\n            uuid = row[eid], #remove or comment out this line to allow ODK Central to create the uuid (useful if you have already tested the csv and created entities with these uuids!)\n            data={k: str(v) for k, v in row.items() if k in entity_properties},\n            entity_list_name=listname,\n            )\n\n         print (\'Uploading entity id: \',row[eid])\n    print (\'Complete\') ' 
                 
+            #MERGE not included in current recipe choices - uncertain about some functions!
             # if self.list_type == "merge":
-                # self.pyodk_recipe +='        # Use MERGE to update existing entity list - this is a complex area with potential for conflicts if Entities could be updated via ODK Collect. Check your work flow!! If in doubt, you might want to use UPDATE instead as it checks against the base_version on Central\n'
+                # self.pyodk_recipe +='        # Use MERGE (with care!) to update existing entity list - this is a powerful but complex area with potential for conflicts if Entities could be updated via ODK Collect. Check your work flow!! If in doubt, you might want to use UPDATE instead as it also checks against the base_version on Central\n'
                 # self.pyodk_recipe +='    client.entities.merge(\n                        data=DictReader(csv_file),\n                        entity_list_name=listname,\n                        source_label_key = entity_label_field,\n                        #match_keys= entity_match_fields, #uncomment if you have another KEY in your dataset to identify the Entity\n'
 
                 # # if self.dlg.QGIS_KEY.currentIndex()>0:
@@ -1881,7 +2071,7 @@ class QuODK:
                 # self.pyodk_recipe +='                        add_new_properties=True, #[for new entity lists or] if you have additional properties to those already in the list - otherwise set to False\n'
             # #if self.list_type =="merge":
                 # self.pyodk_recipe +='                        update_matched=True,\n                        delete_not_matched=False, #switch to True to purge other entities in this list - use with caution!\n'
-                # self.pyodk_recipe +='                        create_source="QuODK/pyODK"\n                        )\n'
+
         else:
             self.pyodk_recipe = ""
         return self.pyodk_recipe
@@ -1892,35 +2082,39 @@ class QuODK:
         if self.pyodk_radio.checkedId() == 1:
             self.list_type = "create"
         elif self.pyodk_radio.checkedId() == 2:
-            self.list_type = "merge"
+            self.list_type = "append"
         elif self.pyodk_radio.checkedId() == 3:
             self.list_type = "update"
         elif self.pyodk_radio.checkedId() == 4:
             self.list_type = "delete"
+        elif self.pyodk_radio.checkedId() == 5:
+            self.list_type = "merge"
         self.pyodk_calls()
         self.dlg.pyODK_code.setPlainText(self.pyodk_recipe)
 
-    def save_entity_config(self):
+    def save_entity_config(self): # not implemented yet - may not have enough use cases?
 
         config = ConfigParser()
+        save_config_section = str(self.dlg.layer_to_Elist.currentText())+'_'+str(self.dlg.Elist_name.text())+'_'+ str(self.list_type)
         QGIS_project = str(QgsProject.instance().absoluteFilePath()).replace('.','_')
-        config_path = '/config_quodk_'+str(self.dlg.layer_to_Elist.currentText())+'_'+str(self.dlg.Elist_name.text())+'.ini'
+        config_path = '/config_quodk.ini'
         
         config.read(QGIS_project+config_path)
-        config.add_section('entity_list')
-        config.set('entity_list', 'projectId', str(self.dlg.projectID_entity.currentIndex()))
-        config.set('entity_list', 'listname', str(self.dlg.Elist_name.text()))
-        config.set('entity_list', 'layer', str(self.dlg.layer_to_Elist.currentIndex()))
-        config.set('entity_list', 'label', str(self.dlg.Elist_label.currentIndex()))
-        config.set('entity_list', 'uuid', str(self.dlg.QGIS_KEY.currentIndex()))
-        config.set('entity_list', 'fields', str(self.entity_properties))
-        config.set('entity_list', 'script', str(self.pyodk_radio.checkedId()))
-        config.set('entity_list', 'folder', str(self.entityCsvFilename))
-        self.dlg.msg2.setText('Saved to: '+ QgsProject.instance().absolutePath()+config_path)
-        self.dlg.save_config.setStyleSheet("background: DarkSeaGreen")
+        
+        config.add_section(save_config_section)
+        config.set(save_config_section, 'projectId', str(self.dlg.projectID_entity.currentIndex()))
+        config.set(save_config_section, 'listname', str(self.dlg.Elist_name.text()))
+        config.set(save_config_section, 'layer', str(self.dlg.layer_to_Elist.currentIndex()))
+        config.set(save_config_section, 'label', str(self.dlg.Elist_label.currentIndex()))
+        config.set(save_config_section, 'uuid', str(self.dlg.QGIS_KEY.currentIndex()))
+        config.set(save_config_section, 'fields', str(self.entity_properties))
+        config.set(save_config_section, 'script', str(self.pyodk_radio.checkedId()))
+        config.set(save_config_section, 'CSV file', str(self.entityCsvFilename))
         try:        
             with open(QgsProject.instance().absolutePath()+config_path, 'w') as f:
                 config.write(f)
+            self.dlg.msg2.setText('Saved to: '+ QgsProject.instance().absolutePath()+config_path)
+            self.dlg.save_config.setStyleSheet("background: DarkSeaGreen")
         except IOError:
             self.dlg.msg2.setText( 'Unable to write to file ' + QgsProject.instance().absolutePath()+config_path )
             self.dlg.save_config.setStyleSheet("background: red")
