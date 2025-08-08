@@ -39,7 +39,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>295</y>
+       <y>293</y>
        <width>801</width>
        <height>215</height>
       </rect>
@@ -601,9 +601,9 @@ headings</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>515</y>
-       <width>611</width>
-       <height>48</height>
+       <y>512</y>
+       <width>620</width>
+       <height>58</height>
       </rect>
      </property>
      <property name="font">
@@ -1242,7 +1242,7 @@ with no geometry</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>295</y>
+       <y>293</y>
        <width>801</width>
        <height>215</height>
       </rect>
@@ -1378,9 +1378,9 @@ with no geometry</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>515</y>
+       <y>512</y>
        <width>611</width>
-       <height>48</height>
+       <height>58</height>
       </rect>
      </property>
      <property name="font">
@@ -1434,12 +1434,15 @@ with no geometry</string>
      </property>
     </widget>
     <widget class="QTextBrowser" name="existing_lists">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
      <property name="geometry">
       <rect>
        <x>539</x>
-       <y>100</y>
+       <y>130</y>
        <width>271</width>
-       <height>111</height>
+       <height>81</height>
       </rect>
      </property>
      <property name="font">
@@ -1452,8 +1455,7 @@ with no geometry</string>
       <bool>false</bool>
      </property>
      <property name="toolTip">
-      <string>HINT: copy and paste an existing list
-if updating or merging</string>
+      <string/>
      </property>
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
@@ -1562,7 +1564,7 @@ if updating or merging</string>
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>295</y>
+       <y>293</y>
        <width>801</width>
        <height>71</height>
       </rect>
@@ -1574,7 +1576,7 @@ if updating or merging</string>
       </font>
      </property>
      <property name="toolTip">
-      <string>This is the [sample] code for pyODK (copy and paste)</string>
+      <string>This is the [sample] code for pyODK (sellect all, copy and paste)</string>
      </property>
      <property name="readOnly">
       <bool>true</bool>
@@ -1583,7 +1585,7 @@ if updating or merging</string>
     <widget class="QRadioButton" name="radio_new_code">
      <property name="geometry">
       <rect>
-       <x>320</x>
+       <x>290</x>
        <y>580</y>
        <width>91</width>
        <height>21</height>
@@ -1599,7 +1601,7 @@ if updating or merging</string>
     <widget class="QRadioButton" name="radio_merge_code">
      <property name="geometry">
       <rect>
-       <x>420</x>
+       <x>630</x>
        <y>580</y>
        <width>91</width>
        <height>21</height>
@@ -1616,7 +1618,7 @@ if updating or merging</string>
     <widget class="QRadioButton" name="radio_update_code">
      <property name="geometry">
       <rect>
-       <x>520</x>
+       <x>460</x>
        <y>580</y>
        <width>91</width>
        <height>21</height>
@@ -1634,7 +1636,7 @@ if updating or merging</string>
       <rect>
        <x>180</x>
        <y>580</y>
-       <width>131</width>
+       <width>101</width>
        <height>21</height>
       </rect>
      </property>
@@ -1651,7 +1653,7 @@ if updating or merging</string>
     <widget class="QRadioButton" name="radio_delete_code">
      <property name="geometry">
       <rect>
-       <x>630</x>
+       <x>560</x>
        <y>580</y>
        <width>91</width>
        <height>21</height>
@@ -1780,6 +1782,57 @@ if updating or merging</string>
      </property>
      <property name="text">
       <string>use as external CSV instead of Entity List</string>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radio_append_code">
+     <property name="geometry">
+      <rect>
+       <x>370</x>
+       <y>580</y>
+       <width>91</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="toolTip">
+      <string>append to existing  entity list</string>
+     </property>
+     <property name="text">
+      <string>Append</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="dataset_2">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>540</x>
+       <y>100</y>
+       <width>271</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Candara</family>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string/>
+     </property>
+    </widget>
+    <widget class="QLabel" name="e_prop_label">
+     <property name="geometry">
+      <rect>
+       <x>420</x>
+       <y>130</y>
+       <width>121</width>
+       <height>27</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Properties</string>
      </property>
     </widget>
    </widget>
