@@ -83,23 +83,29 @@ If the selected project includes any Entity Lists you have the option to downloa
 
 ![screen-shot of entities](/Screenshot6.png)
 
+**Note**: ODK Entity Lists are 'agnostic' about geometry - this means that you can mix-and-match different geometry types in a single entity list providing you have a field called *geometry*. This presents a challenge when downloading an entity list as QGIS can only use one geometry type per layer. QuODK handles this by splitting out the geometry according to type (Point / Line / Polygon) and loading separate layers for each but with the same attribute structure.
+
 # Entity Management
 If you need to generate an Entity List from a QGIS layer, or edit existing Entities in QGIS (e.g. adjust the geometry or other attributes), QuODK can be used to prepare a CSV file that can be uploaded to ODK Central Server. This is a relatively complex concept and you are well advised to become familiar with Entities before using QuODK for this purpose - for example: https://docs.getodk.org/entities-quick-reference/
 
 ![screen-shot of creating entity list](/Screenshot7.png)
 
-You can export QGIS layers (point, line or polygon, or even those without geometry) with any attributes within that layer. **NOTE**: make sure your geometry is 'single part' - each entity needs to have its own geometry and multipart geometries cannot be handled.
+You can export QGIS layers (point, line or polygon, or even those without geometry) with any attributes within that layer. **NOTE**: make sure your geometry is 'single part' - each entity needs to have its own geometry and multipart geometries cannot be handled. 
 
 
-QuODK will generate a UUID field or you can choose an existing UUID (useful if you want to update existing entities or keep a clear link between QGIS data and Entity lists or if you are updating entities). This also means you could include additional fields that control the format of the entity on the map widgets (e.g. colour, marker or line width)
+QuODK will generate a UUID field or you can choose an existing UUID (useful if you want to update existing entities or keep a clear link between QGIS data and Entity lists or if you are updating entities). This also means you could include additional fields that control the format of the entity on the map widgets (e.g. marker-colour, marker-style, stroke or stroke-width).
+
+If you are using existing Entity Lists, QuODK will try to match the fields in your QGIS layer with those in the Entity List selected - it doesn't always work, but in most 'working scenarios' it should be straightforward. For example if you download a set of entities from a List on Central, make changes to geometry or attributes, you can select the Entity List using the drop-down menu and match the exported ENTITY_New layer, then QuODK will pre-fill the rest and produce the script to update (and you can also select a sub-set of entities within the layer in QGIS).
 
 ![screen-shot of entity list preview](/Screenshot10.png)
 
 However, upload of new entities or modification of existing entities requires additional privileges in Central and could potentially affect data collection / data integrity. For this reason (and because it is hard to anticipate every scenario for adapting entity lists), you cannot update Entities directly from QuODK. There is an intermediary step that needs to be done with pyODK (please see https://getodk.github.io/pyodk) - so you need to know how to drive pyODK!
 
+It appears that OData replaces the dash - character with the underscore _ character when exporting from Central. This potentially causes problems for entities if you are trying to update an existing Entity List. QuODK will change *known* fields such as *marker-color* (which is exported as *marker_color*) but if you have fields that include a dash, be prepared for trouble.
+
 ![screen-shot of pyODK recipe](/Screenshot11.png)
 
- QuODK will also generate the basis of a pyODK script for you to copy and paste (e.g. into Jupyter Lab). You can adapt it to create, update, merge or delete entities. The CSV file includes the **\__id** column to identify the UUID on ODK Central
+ QuODK will also generate a pyODK script for you to copy and paste (e.g. into Jupyter Lab). You can select whether to create, append, update or delete entities using the script. The CSV file includes the **\__id** column to identify the UUID on ODK Central
 
 
 # Credits
