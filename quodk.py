@@ -904,7 +904,7 @@ class QuODK:
             self.headFont.setBold(True)
             for heading in headings:
                 if '_' in heading and '__' not in heading and 'base_version' not in heading:  
-                    self.dlg.dataTable.horizontalHeaderItem(i).setFont(headFont)
+                    self.dlg.dataTable.horizontalHeaderItem(i).setFont(self.headFont)
                 i +=1
             self.dlg.dataTable.resizeColumnsToContents()
             # convert dataframe to array before populating table
