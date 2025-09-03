@@ -43,7 +43,7 @@ QuODK requires PANDAS package to be installed in order to function:
 
 Ask the person responsible for managing your ODK Central server to provide you with log-in details.
 
-**Hint**: it may be useful to set up a separate web-user on Central with restricted access - e.g. Project Viewer. You can choose whether or not to save the ODK Central password. **NOTE**: the set up data is stored in plain-text on your computer in the QGIS plug-in folder.
+**Hint**: it may be useful to set up a separate web-user on Central with restricted access - e.g. Project Viewer. You can choose whether or not to save the ODK Central password. **NOTE**: the set up data is stored in plain-text on your computer in ~~the QGIS plug-in folder~~ your HOME folder (as of v1.3.2) - this means that is won't be overwritten when upgrading to new versions in future.
 
 # Using QuODK
 Within this plugin there is an underlying assumption that you are vaguely familiar with ODK Collect / Webforms / Enketo and the outputs from ODK Central (QuODK works with the API and oData outputs) - please see the documentation if you are in doubt https://docs.getodk.org - please make sure you understand the concept of forms, repeat groups, submissions, media attachments and entities before setting sail with QuODK.
