@@ -1305,7 +1305,7 @@ with no geometry</string>
       </rect>
      </property>
      <property name="text">
-      <string>Exsiting lists</string>
+      <string>Existing lists</string>
      </property>
     </widget>
     <widget class="QPushButton" name="export_Elist_to_csv">
