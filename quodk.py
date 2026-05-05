@@ -1444,7 +1444,7 @@ class QuODK:
 
                 if len(vertices) == 1:
                     geomType = "POINT"
-                elif vertices[0] == vertices[-1]:
+                elif vertices[0] == vertices[-1].lstrip(' '):
                     geomType = "POLYGON"
                 else:
                     geomType = "LINESTRING"
