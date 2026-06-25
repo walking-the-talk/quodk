@@ -8,7 +8,7 @@
                               -------------------
         begin                : 2024-03-30
         git sha              : $Format:%H$
-        copyright            : (C) 2024-2025 by Walking-the-Talk
+        copyright            : (C) 2024-2026 by Walking-the-Talk
         email                : chris.york@walking-the-talk.co.uk
  ***************************************************************************/
 
@@ -21,37 +21,19 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, QMetaType, Qt
-from qgis.PyQt.QtGui import *# using QIcon, QImage, QPixmap
-from qgis.PyQt.QtWidgets import QAction, QComboBox, QFileDialog,  QLabel,  QTableWidget, QTableWidgetItem, QButtonGroup
-from qgis.core import * # using QgsVectorLayer,QgsFeature
-from qgis.gui import * #using QgsMapLayerComboBox, QgsFieldComboBox
-
-from math import isnan
 import os
-import os.path
-import pandas as pd
-import uuid
-from configparser import ConfigParser
+from datetime import datetime
 
-# Initialize Qt resources from file resources.py
-from .resources import *
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt
+from qgis.PyQt.QtGui import QIcon, QPixmap
+from qgis.PyQt.QtWidgets import QAction, QButtonGroup
+from qgis.core import QgsCoordinateReferenceSystem
 
-# Import the code for the dialog
-from .quodk_dialog import QuODKDialog
-
-
-
-import requests
-import json
-from urllib.parse import urlparse
-from collections.abc import Mapping
-from functools import reduce
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
-import webbrowser
-
-import shutil
+from .autopilot import auto_pilot_interface
+# Import the dialogs
+from .quodkui import QuODKui, QuODKAutoPilot
+# Import the refactored UI interface
+from .quodk_ui import QuodkInterface
 
 
 class QuODK:
@@ -88,6 +70,11 @@ class QuODK:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
+        self.first_start_auto_pilot = None
+
+        # Interface instances will be created on first run
+        self.interface = None
+        self.interface_auto_pilot = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -182,15 +169,26 @@ class QuODK:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = ':/plugins/quodk/icon.png'
+        icon_path = f"{self.plugin_dir}/quodk_icon.png"
+        auto_icon_path = f"{self.plugin_dir}/quodk_ap_icon.png"
         self.add_action(
             icon_path,
             text=self.tr(u'QuODK'),
             callback=self.run,
             parent=self.iface.mainWindow())
 
+        # Add second action for Auto-Pilot dialog
+        self.add_action(
+            icon_path,
+            text=self.tr(u'QuODK Auto-Pilot'),
+            callback=self.run_auto_pilot,
+            add_to_toolbar=False,  # Only add to menu, not toolbar
+            parent=self.iface.mainWindow())
+
         # will be set False in run()
         self.first_start = True
+        self.first_start_auto_pilot = True
+
 
 
     def unload(self):
@@ -207,1923 +205,279 @@ class QuODK:
 
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
-        if self.first_start == True:
-            #self.first_start = False
-            self.dlg = QuODKDialog()
+        if self.first_start:
+            self.first_start = False
+            self.dlg = QuODKui()
+            self.interface = QuodkInterface(self.iface, self.dlg, self.plugin_dir)
 
-        #set default date range as today - will be converted to 00:00 to 23:59
-        self.dlg.DateStart.setDate(datetime.now())
-        self.dlg.DateEnd.setDate(datetime.now())
-        self.dlg.DateStart.dateChanged.connect(self.onDateChanged)
-        self.dlg.DateEnd.dateChanged.connect(self.onDateChanged)
-        self.dlg.load_all.toggled.connect(self.DateUpdate)
-        self.dlg.ODK_connect.clicked.connect(self.connectODK)
-        self.dlg.ODK_connect_2.clicked.connect(self.connectODK)
-        self.dlg.projectID.activated.connect(self.list_forms)
-        self.dlg.formID.activated.connect(self.list_repeatGroup)
-        self.dlg.repeatGroup.activated.connect(self.list_submissions)
-        self.dlg.attributeFilter.activated.connect(self.filter_items)
-        self.dlg.filterValue.activated.connect(self.filter_Value)
-        self.dlg.clearFilter.clicked.connect(self.clearFilter)
-        self.dlg.odk_geometry.activated.connect(self.set_geometry)
-        self.dlg.ignore_nogeom.toggled.connect(self.set_geometry)
-        self.dlg.crs.setEnabled(True)
-        self.dlg.crs.setCrs(QgsCoordinateReferenceSystem('EPSG:4326'))
-        self.dlg.crs.crsChanged.connect(self.crs)
-        self.dlg.save_csv.clicked.connect(self.saveCSV)
-        self.dlg.load_to_canvas.clicked.connect(self.layerLoadQgis)
-        self.dlg.Attachments.clicked.connect(self.download_images)
-        self.dlg.attributeFilter.setEnabled(False)
-        self.dlg.filterValue.setEnabled(False)
-        self.dlg.filterExclude.setEnabled(False)
-        self.dlg.Attachments.setEnabled(False) 
-        self.dlg.save_csv.setEnabled(False)
-        self.dlg.load_to_canvas.setEnabled(False) 
-        wtt=QPixmap(os.path.join(os.path.dirname(__file__), 'WTT.png'))
-        self.dlg.WTT_label.setPixmap(wtt)
-        pix=QPixmap(os.path.join(os.path.dirname(__file__), 'quodk.png'))        
-        self.dlg.QuODK_label.setPixmap(pix)
-        self.dlg.QuODK_label_2.setPixmap(pix)
-        self.dlg.QuODK_label_3.setPixmap(pix)
-        self.dlg.closeWindow.clicked.connect(self.dlg.reject)
-        self.dlg.filterExclude.clicked.connect(self.changeFilterState)
-        self.dlg.dataset.activated.connect(self.select_entity_list)
-        self.dlg.entity_status.activated.connect(self.list_Entities)
-        
-     
-        #For entity lists
-        self.dlg.ODK_connect_3.clicked.connect(self.connectODK)
-        self.dlg.quodk_tab.currentChanged.connect(self.tabChanged)
-        self.dlg.layer_to_Elist.activated.connect(self.layer_to_entity_list)
-        self.dlg.dataset_2.activated.connect(self.entity_list_properties)
-        self.dlg.Elist_name.editingFinished.connect(self.check_list_exists)
-        self.dlg.Elist_name.textEdited.connect(self.reset_msg)
-        self.dlg.Elist_label.activated.connect(self.update_properties_list)
-        self.dlg.QGIS_KEY.activated.connect(self.check_is_UUID)
-        self.dlg.precheck_csv.clicked.connect(self.precheck_csv)
-        self.dlg.export_Elist_to_csv.clicked.connect(self.entity_to_CSV)
-        self.dlg.projectID_entity.activated.connect(self.show_existing_lists)
-        self.dlg.selected_features.toggled.connect(self.use_selected)
-        self.dlg.pyODK_code.resize(0,0)
-        self.dlg.Elist_properties.view().setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.pyodk_radio = QButtonGroup()
-        self.pyodk_radio.addButton(self.dlg.radio_new_code,1)
-        self.pyodk_radio.addButton(self.dlg.radio_append_code,2)
-        self.pyodk_radio.addButton(self.dlg.radio_update_code,3)
-        self.pyodk_radio.addButton(self.dlg.radio_delete_code,4)
-        self.pyodk_radio.addButton(self.dlg.radio_merge_code,5)
-        self.pyodk_radio.setExclusive(True)
-        self.pyodk_radio.buttonClicked.connect(self.pyodk_buttons)
-        #self.dlg.load_entity_list_to_canvas.clicked.connect(self.load_entity_list_to_canvas)
-        #self.dlg.load_entity_list_to_canvas.setEnabled(False)
-        self.dlg.save_config.clicked.connect(self.save_entity_config)
-        
-        self.dlg.closeWindow_2.clicked.connect(self.dlg.reject) # entities tab
+            # Create the interface instance with the dialog and plugin directory
+            #self.interface = QuodkInterface(self.iface, self.dlg, self.plugin_dir)
 
-        # ====================================================================================================
-        session_token = ''
-        selected_projectID = 0   
-        #Load language labels
-        self.language_EN()
+            # Setup UI connections
+            self.setup_ui_connections()
 
-        # show the dialog
+        # Reset date range to today
+        if hasattr(self.dlg, 'DateStart'):
+            self.dlg.DateStart.setDate(datetime.now())
+        if hasattr(self.dlg, 'DateEnd'):
+            self.dlg.DateEnd.setDate(datetime.now())
+
+
+        # Show the dialog
+
         self.dlg.show()
-        self.dlg.save_config.hide() # not ready
-        self.dlg.load_entity_list_to_canvas.hide() # not ready
-        #pyODK script buttons
-        self.dlg.radio_new_code.hide()
-        self.dlg.radio_append_code.hide()
-        self.dlg.radio_update_code.hide()
-        self.dlg.radio_delete_code.hide()
-        self.dlg.label_radio_group.hide()
-        self.dlg.radio_merge_code.hide()
-        self.dlg.e_prop_label.hide()
-        self.headFont = QFont()
-        self.underScoreColumns = ["marker_color","marker_symbol","stroke_width", "stroke_opacity","marker_size"]
-        
-        self.get_logins()
-        self.populateLayers()
-        self.onDateChanged()   
-        self.existing_lists = ''
 
         # Run the dialog event loop
-        result = self.dlg.exec_()
-        # See if OK was pressed
-        if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            pass
-            
-    # ====================================================================================================
-    # LabelsTranslations: English
-    def language_EN(self):
+        result = self.dlg.exec()
 
-        self.dlg.label_odk_url.setText('ODK URL')
-        self.dlg.label_odk_username.setText('Username')
-        self.dlg.label_odk_pass.setText('Password')
-        self.dlg.label_projectID.setText('Projects')
-        self.dlg.label_daterange.setText('Get submissions from')
-        self.dlg.label_formID.setText('ODK Form')
-        self.dlg.label_repeatGroup.setText('Subset')
-        self.dlg.label_attributeFilter.setText('Filter')
-        self.dlg.label_odk_geometry.setText('Geometry')
-        self.dlg.label_date_to.setText('to')
-        self.dlg.help_label.setText('Help')
-        self.dlg.ODK_connect.setText('Connect to ODK Central')
-        self.dlg.remove_groups.setText('Remove group \nheadings')
-        self.dlg.ignore_nogeom.setText('Include submissions \nwith no geometry')
-        self.dlg.load_to_canvas.setText('Load layer to canvas')
-        self.dlg.save_odk_pass.setText('Save password')
-        self.dlg.load_all.setText('ignore dates')
-        self.dlg.save_csv.setText('Save as CSV')
-        #Dynamic labels / feedback within the dialog
-#        self.dlg.QGIS_Layer_label.setText('Load ODK submissions to QGIS')
-        self.tr_projectID = "-Select Project-"
-        self.tr_formID = "-Select Form-"
-        self.tr_repeatGroup = "-Select sub/repeat group-"
-        self.tr_odk_geometry = "-Select Geometry-"
-        self.tr_attributeFilter = "-Select Attribute-"
-        self.tr_filterValues = "-Select Value-"
-        self.tr_attachments_error = "Problem with attachments"
-        self.tr_date_error = "Error: the left date should be earlier or equal"
-        self.tr_no_data_in_range = "No data - try changing date range"
-        self.tr_submissions_found = "Number of submissions found: "
-        self.tr_layer_added = "Layer added - projected using "
-        self.tr_general_error = "There is an error"
-        self.tr_layer_error = "Error with this layer"
-        self.tr_select_filepath = "Please select a folder for the CSV"
-        self.tr_csv_exported = "CSV file exported to: "
-        self.tr_treewidget_head = ["Filename","Type","URL"]
-        self.tr_mainForm = "Submissions(Main form)"
-        self.tr_select_form_repeat = "Please select Form/Repeat/Geometry before loading"
-        self.tr_check_server = "Please check server settings"
-        self.tr_image_folder = "Select folder for images"
-        self.tr_wait_images = "Please wait while the server collates images"
-        self.tr_table_only = "Load table only (no geometry)"
-        self.tr_filterExclude = "in/out"
-        
-        #Entities
-        self.tr_dataset = "-Select Entity List-"
-        self.tr_entities_found = "Number of entities found: "
-        self.tr_no_datasets = " No datasets on Central "
-        self.tr_selectdataset = "-Select Entity List-"
-        self.tr_entitystatus = ["-Select status-","New","Updated"]
-        self.tr_empty_list = "This list may be empty!"
-        self.tr_multipart = "This layer has multipart geometry which cannot be converted to Entities - please convert to singlepart or choose a different layer"
-        self.tr_list_exists = "This list name already exists make sure you have the correct properties selected to match. PyODK script will be 'merge' to add / update entities in this list, or use 'update' to complex operations"
-        self.tr_similar_list_exists = "There is a similar list (upper or lower case) - you can't use this name with the current project in Central. Please rename or use a different project."
-        self.tr_entity_name_required = "Please type a name for your entity list"
-        self.tr_not_connected = "Please connect to ODK central in order to check for existing lists / duplication (optional)"
-        self.tr_too_many_entities = "You have too many items in this layer - it will degrade performance of ODK Collect. You may wish to select a subset. Number of rows in layer: "
-        self.tr_this_many_entities = "Number of rows in layer: "
-        self.tr_selected_in_layer = "Number of items selected in this layer: "
-        self.tr_no_geom_layer = "This layer has no geometry so you can't use select_one map appearance in ODK Collect"
-        self.tr_no_entity_properties = "Please select at least one field to add to the entities"
-        self.tr_invalid_uuid = "This field is not a valid uuid - you can use the field calculator in QGIS to create a new field as a UUID. Leaving ODK Central to create one means you can't easily track your entities in QGIS"
-        self.tr_nogeom_row = " rows with no geometry - please check your attribute table - they are in the list, but won't be accessible in ODK Collect select_one map appearance"
-        self.tr_unknown_geometry ="QGIS cannot determine the type of geometry for this layer - please convert to single-part geometry (point / line or polygon) and try again"
-        self.tr_none_selected = "No items are selected in the chosen layer"
-        self.tr_no_qgis_project = "No QGIS project open or no valid layers available"
-        self.tr_file_error = "Unable to save the file in the selected location"
-        self.tr_label_not_unique = "The attributes in this field are not unique - you can still use this field, but consider how to differentiate the duplicates in practice"
-        self.tr_label_includes_null = "This field has NULL values which cannot be used for labels - try selecting valid features or change the data"
-        self.tr_select_csv = "Although you can generate a script for pyODK please export the CSV so that this variable can be added to the script"
-        self.tr_same_fields = "You can't use the same field for both label and uuid"
-        self.tr_no_uuid = "You must specify a valid UUID column that matches the Entity list in order to be able to delete entities!"
-        self.tr_not_all_properties_selected = "You have not selected all the properties that exist on the Central version of this Entity List. If you are using MERGE you need to specify the key combinations. Otherwise updating or appending to this List could fail."
-        self.tr_mind_the_underscore = 'The following columns may have been changed when importing from Central:  '
-        self.tr_mind_the_underscore2 = '\n Check whether need to change the _ to a - for the import to work as expected.'
+    def run_auto_pilot(self):
+        """Run method for Auto-Pilot dialog"""
 
-        self.dlg.quodk_tab.setTabText(0,'Download Submissions and Entities')
-        self.dlg.quodk_tab.setTabText(1,'Entity management')
-        self.dlg.quodk_tab.setTabText(2,'Settings')
+        # Create the dialog with elements (after translation) and keep reference
+        # Only create GUI ONCE in callback, so that it will only load when the plugin is started
+        if self.first_start_auto_pilot:
+            self.first_start_auto_pilot = False
+            self.dlg_auto_pilot = QuODKAutoPilot()
+            self.interface_auto_pilot = auto_pilot_interface(self.iface, self.dlg_auto_pilot, self.plugin_dir)
 
-        self.dlg.help_text.setText('<h4>About</h4><p>This plugin works alongside an <strong>ODK Central Server</strong> (not Kobo / Ona etc). It allows you to load geo-located data gathered in ODK Collect forms as QGIS temporary layers, as well as download associated attachments. It is designed to allow you to incrementally download submissions (by selecting a date range of when data was sent from ODK Collect to the server. You can, with caution, opt to load all records - bear in mind this could take some time for large datasets with lots of attachments.</p><h4>Set up</h4><p>Ask the person responsible for managing your ODK Central server to provide you with log-in details (<strong>hint:</strong> it may be useful to set up a separate <a href="https://docs.getodk.org/central-users/">web-user on Central</a> with restricted access - e.g. Project Viewer). You can choose to save the password (stored in plain-text on your computer in the plug-in folder).</p><h4>Loading data</h4><p>Once you connect to your server you will get a list of ODK projects if appropriate, and then you can select the form you would like to download. If your form has repeat groups with location data you can select the repeat as well as the main form. You can load any form or repeat as a simple table if there is no location data (in case you want to link data in QGIS).</p><p>You can select a different Projection for the layer to fit with your project / location (e.g. OSGB grid). You can also download data as CSV.</p><strong>NOTE:</strong> By default QuODK only loads features with spatial data (point / line / polygon) so that they can be displayed in QGIS, but if you have some records that have no location data you can choose to include them and manual add relevant spatial data [once the layer is loaded, select the feature in the attribute table and then choose <i>Add part</i> in QGIS digitising toolbar] <h4>Attachments</h4><p>After you have selected the data you can download related attachments to a folder on your computer. This plugin also creates a project variable called @ODK_image_path so that you can view the attachments in the attribute form by setting the default path to this variable. Be aware that the plugin might freeze for a while when it loads the attachments form if you have lots of submissions. If you choose to download all the attachments listed it can take a while, needing high bandwidth - use with caution. </p><h4>Entities</h4><p>As of version 1.2 QuODK supports downloading entity lists from Central and <i>indirectly</> managing Entity lists. Upload of new entities or modification of existing entities requires additional privileges in Central and could potentially affect data collection. For this reason (and because it is hard to anticipate every scenario for adapting entity lists), you can convert a QGIS vector layer to CSV but cannot update Central directly from QuODK.</p><p>You can export QGIS layers (point, line or polygon, or even those without geometry) to the CSV format required by Central - it will include a UUID field or you can choose an existing UUID. QuODK will generate the basis for a pyODK script for you to copy and paste (e.g. into Jupyter Lab).</p><h4>Credits</h4><p>This plugin was inspired by FooODK which written in Swahili for WWF Tanzania by <strong>Cuthbert-Langen Mushi</strong>. Code refactoring, additional features and translations were implemented by Chris York at <a href="https://walking-the-talk.co.uk">Walking-the-Talk</a>. The plugin uses the ODK Central API to access the server and more functionality is planned (e.g. working with entities, and potentially deleting submissions)...</p><h4>Find out more about ODK</h4><p>ODK is an ecosystem of open source mobile data collection supported by a core development team and an active community.</p> <a href="https://getodk.org">ODK website</a></p><p><a href="https://forum.getodk.org">ODK forum</a> and <a href="https://docs.getodk.org">ODK documentation</a></p>')
-    
-    # ====================================================================================================
-    def cw(self):
-        self.close
-    # ====================================================================================================    
-    def tabChanged(self):
-        if self.dlg.quodk_tab.currentIndex() == 1:
-        
-            self.populateLayers()
-        else:
-            pass
+            # Setup UI connections for auto-pilot dialog
+            self.setup_ui_connections_auto_pilot()
 
-    
-    def reset_msg(self):
-        self.dlg.msg.setText("")
-        self.dlg.msg.setStyleSheet("color: black; background: none")
+        # Reset date range to today
+        self.dlg_auto_pilot.DateStart.setDate(datetime.now())
+        self.dlg_auto_pilot.DateEnd.setDate(datetime.now())
 
-        self.dlg.msg2.setText("")
-        self.dlg.msg2.setStyleSheet("color: black; background: none")
-        return
+        # Show the dialog
+        self.dlg_auto_pilot.show()
 
-    # ====================================================================================================    
-    # Get credentials from file - Potential to store password - PLAIN TEXT!!!!        
-    def get_logins(self):
-        quodkinit = os.path.join(os.path.dirname(__file__), 'quodkinit.txt')
-            
-        if os.path.isfile(quodkinit):
-            f = open(quodkinit, 'r')
-            credentials = f.readlines()
-            if credentials:
-#                print(credentials)
-                credentials_split = (credentials[0]).split(";")
-                f.close()
-            
-                odk_url_toml = (credentials_split[0]).split("|")
-                if odk_url_toml[0] == 'odk_url':
-                    odk_url_tomlb = str(odk_url_toml[1])
-                    self.dlg.odk_url.setText(odk_url_tomlb)
-                
-                odk_username_toml = (credentials_split[1]).split("|")
-                if odk_username_toml[0] == 'odk_username':
-                    odk_username_tomlb = str(odk_username_toml[1])
-                    self.dlg.odk_username.setText(odk_username_tomlb)
-                
-                store_pass_toml = (credentials_split[2]).split("|")
-                if store_pass_toml[0] == 'store_pass':
-                    if store_pass_toml[1] =='False':
-                        self.dlg.odk_pass_store_pass.setChecked(False)               
-                
-                odk_pass_toml = (credentials_split[3]).split("|")
-                if odk_pass_toml[0] == 'odk_pass':
-                    odk_pass_tomlb = str(odk_pass_toml[1])
-                    self.dlg.odk_pass.setText(odk_pass_tomlb)
-                
-        if self.dlg.odk_url.text() == '' or self.dlg.odk_username.text() == '' or self.dlg.odk_pass.text() == '':
-            self.dlg.msg.setText('Please check your server settings before proceeding')
-            self.dlg.quodk_tab.setCurrentIndex(2)
+        # Run the dialog event loop
+        result = self.dlg_auto_pilot.exec()
 
-    # -----------------------------------------------------------------------------------------------
-    # Store credentials to text file
-    def store_login_data(self):
-        quodkinit = os.path.join(os.path.dirname(__file__), 'quodkinit.txt')
-        
-        odk_url = self.dlg.odk_url.text()
-        odk_username = self.dlg.odk_username.text()
-        
-        if self.dlg.save_odk_pass.isChecked():
-            store_pass = 'True'
-            odk_pass = self.dlg.odk_pass.text()
-        else:
-            store_pass = 'False'
-            odk_pass = ''
-        odk_url_odk_username = "odk_url|" + str(odk_url) + ";" + "odk_username|" + str(odk_username)+ ";store_pass|" + str(store_pass)+ ";odk_pass|" + str(odk_pass)
+    def setup_ui_connections(self):
+        """Setup all UI element connections to interface methods. Where necessary use auto / manual / config for routing / options"""
 
-        credentials = []
-        if os.path.isfile(quodkinit):
-            f = open(quodkinit, 'r')
-            credentials = f.readlines()
-            if credentials:
-                credentials[0] = odk_url_odk_username
-            f.close()
-            
-            f = open(quodkinit, "w")
-            if credentials:
-                f.writelines(credentials)
-            f.close()
+        # Date controls
+        if hasattr(self.dlg, 'DateStart'):
+            self.dlg.DateStart.dateChanged.connect(lambda: self.interface.onDateChanged('manual'))
+        if hasattr(self.dlg, 'DateEnd'):
+            self.dlg.DateEnd.dateChanged.connect(lambda: self.interface.onDateChanged('manual'))
+        if hasattr(self.dlg, 'load_all'):
+            self.dlg.load_all.toggled.connect(self.interface.DateUpdate)
+        # Connection buttons
+        if hasattr(self.dlg, 'ODK_connect'):
+            self.dlg.ODK_connect.clicked.connect(lambda: self.interface.connectODK('manual'))
+        if hasattr(self.dlg, 'ODK_connect_go'):
+            self.dlg.ODK_connect_go.clicked.connect( self.interface.auto_pilot)
+        if hasattr(self.dlg, 'ODK_connect_test'):
+            self.dlg.ODK_connect_test.clicked.connect(lambda: self.interface.connectODK('manual'))
+        if hasattr(self.dlg, 'encrypt'):
+            self.dlg.encrypt.clicked.connect(lambda: self.interface.check_credentials(True))
 
-        if not os.path.isfile(quodkinit):
-            f = open(quodkinit, "w")
-            f.writelines(odk_url_odk_username)
-            f.close()
+        # Project/Form/Repeat navigation
+        if hasattr(self.dlg, 'projectID'):
+            self.dlg.projectID.activated.connect(lambda: self.interface.forms_list('manual'))
+        if hasattr(self.dlg, 'formID'):
+            self.dlg.formID.activated.connect(lambda: self.interface.repeats_list('manual'))
+        if hasattr(self.dlg, 'formID_2'):
+            self.dlg.formID_2.activated.connect(lambda: self.interface.repeats_list('config'))
+        if hasattr(self.dlg, 'repeatGroup'):
+            self.dlg.repeatGroup.activated.connect(lambda: self.interface.list_submissions(None,'manual'))
+        if hasattr(self.dlg, 'odk_geometry'):
+            self.dlg.odk_geometry.activated.connect(self.interface.set_geometry)
 
-    # ====================================================================================================
-    # ====================================================================================================
-    # Get ODK Central Projects
-    def connectODK(self): #triggered by Connect button on either tab
-        self.reset_msg
-        self.dlg.ODK_connect.setStyleSheet("background: orange")
-        self.dlg.ODK_connect_2.setStyleSheet("background: orange")  
-        self.dlg.ODK_connect_3.setStyleSheet("background: orange")
-        self.dlg.projectID.clear()
-        self.dlg.formID.clear()
-        self.dlg.repeatGroup.clear()
-        self.dlg.odk_geometry.clear()
-        self.dlg.attributeFilter.clear()              
-        global session_token
-        session_token = self.get_session_token()
-        if session_token:
-            
-            self.dlg.projectID.addItem(self.tr_projectID)
-            self.dlg.projectID_entity.addItem(self.tr_projectID)
-#            self.dlg.formID.addItem(self.tr_formID)   
-#            self.dlg.repeatGroup.addItem(self.tr_repeatGroup)    
-#            self.dlg.odk_geometry.addItem(self.tr_odk_geometry)   
-#            self.dlg.attributeFilter.addItem(self.tr_attributeFilter)
-            self.dlg.ODK_connect.setStyleSheet("background: DarkSeaGreen")
-            self.dlg.ODK_connect_2.setStyleSheet("background: DarkSeaGreen")
-            self.dlg.ODK_connect_3.setStyleSheet("background: DarkSeaGreen")
-            self.list_projects()
-   
-    # ====================================================================================================
-    # ODK Central Session
-    def get_session_token(self):
-        global odk_url
-        odk_url = self.dlg.odk_url.text()
-        if odk_url.endswith("/"):
-            odk_url = odk_url[:-1]
-            self.dlg.odk_url.setText(odk_url)
-        odk_username = self.dlg.odk_username.text()
-        odk_username = self.dlg.odk_username.text()
-        odk_pass = self.dlg.odk_pass.text()
-        session_URL = (str(odk_url),"/v1/sessions")
-        try:
-            email_token_response = requests.post("".join(session_URL), data = json.dumps({"email": odk_username, "password": odk_pass}), headers = {"Content-Type": "application/json"},)        
-            if email_token_response.status_code == 200:
-                self.dlg.status.setStyleSheet("color: DarkSeaGreen")
-                self.dlg.status_2.setStyleSheet("color: DarkSeaGreen")
-                #print(email_token_response.json()["token"])
-                return email_token_response.json()["token"]
+        # Filtering (differentiate between manual or config)
+        if hasattr(self.dlg, 'attributeFilter'):
+            self.dlg.attributeFilter.activated.connect(lambda: self.interface.filter_items('manual'))
+        if hasattr(self.dlg, 'attributeFilter_2'):
+            self.dlg.attributeFilter_2.activated.connect(lambda: self.interface.filter_items('config'))
+        if hasattr(self.dlg, 'valueFilter'):
+            self.dlg.valueFilter.activated.connect(lambda: self.interface.filter_Value('manual'))
+        if hasattr(self.dlg, 'valueFilter_2'):
+            self.dlg.valueFilter_2.activated.connect(lambda: self.interface.filter_Value('config'))
+        if hasattr(self.dlg, 'entityValueFilter'):
+            self.dlg.entityValueFilter.activated.connect(lambda: self.interface.filter_Value('entity_config'))
+        if hasattr(self.dlg, 'entityFilter'):
+            self.dlg.entityFilter.activated.connect(lambda: self.interface.filter_items('entity_config'))
+        if hasattr(self.dlg, 'entityFilter_2'):
+            self.dlg.entityFilter_2.activated.connect(lambda: self.interface.filter_items('config'))
+        if hasattr(self.dlg, 'add_manual_filter'):
+            self.dlg.add_manual_filter.clicked.connect(self.interface.add_filter_value)
+        if hasattr(self.dlg, 'clearFilter'):
+            self.dlg.clearFilter.clicked.connect(lambda: self.interface.clearFilter('manual'))
+        if hasattr(self.dlg, 'clearFilter_2'):
+            self.dlg.clearFilter_2.clicked.connect(lambda: self.interface.clearFilter('config'))
+        if hasattr(self.dlg, 'filterExclude'):
+            self.dlg.filterExclude.clicked.connect(lambda: self.interface.changeFilterState('manual'))
+        if hasattr(self.dlg, 'filterExclude_2'):
+            self.dlg.filterExclude_2.clicked.connect(lambda: self.interface.changeFilterState('config'))
+        if hasattr(self.dlg, 'entityFilterExclude'):
+            self.dlg.entityFilterExclude.clicked.connect(lambda: self.interface.changeFilterState('entity_config'))
 
-            else:
-                self.dlg.msg.setText(self.tr_check_server)
-                self.dlg.msg.setStyleSheet("background: red")
-                self.dlg.ODK_connect_2.setStyleSheet("background: red")
-                self.dlg.ODK_connect.setStyleSheet("background: red")
-                self.dlg.ODK_connect_3.setStyleSheet("background: red")
-                self.dlg.quodk_tab.setCurrentIndex(2)
-        except:
-            self.dlg.msg.setText('Please check this a valid URL')
-            self.dlg.ODK_connect.setStyleSheet("background: red")
-            self.dlg.ODK_connect_2.setStyleSheet("background: red")
-            self.dlg.ODK_connect_3.setStyleSheet("background: red")
-            self.dlg.quodk_tab.setCurrentIndex(2)
-    # ====================================================================================================
-    #List all Projects
-    def list_projects(self): #triggered after Connecting to Central
-        projects_url = (str(odk_url),"/v1/projects/")
-        projects_response = requests.get("".join(projects_url),headers={"Authorization": "Bearer " + session_token},)
-        projects = {}
-        
-        if projects_response.status_code == 200:
-            self.store_login_data()
-            #self.dlg.quodk_tab.setCurrentIndex(0) # set the form to show submissions / entities tab
-            for project in projects_response.json():
-                self.dlg.projectID.addItem(str(project["id"]) + '|' + project["name"])
-                self.dlg.projectID_entity.addItem(str(project["id"]) + '|' + project["name"])
-            if self.dlg.projectID.count() == 2:
-                self.dlg.projectID.setCurrentIndex(1)
-                self.dlg.projectID_entity.setCurrentIndex(1)
-                self.existing_entity_lists() #new in v1.2
-                self.list_forms()
-           
-    # ====================================================================================================
+        # Entity list selection
+        if hasattr(self.dlg, 'dataset') and hasattr(self.interface, 'select_entity_list'):
+            self.dlg.dataset.activated.connect(lambda: self.interface.select_entity_list ('manual'))
+        if hasattr(self.dlg, 'dataset_config') and hasattr(self.interface, 'select_entity_list'):
+            self.dlg.dataset_config.activated.connect(lambda: self.interface.select_entity_list('config'))
+        if hasattr(self.dlg, 'entity_status') and hasattr(self.interface, 'list_Entities'):
+            self.dlg.entity_status.activated.connect(lambda: self.interface.list_Entities('manual'))
 
-    #List all Forms
-    def list_forms(self): # triggered by Projects combo box
-        #(re)set combo boxes to blank / default text
-        self.dlg.formID.clear()
-        self.dlg.repeatGroup.clear()
-        self.dlg.odk_geometry.clear()
-        self.dlg.attributeFilter.clear()
-        self.dlg.formID.addItem(self.tr_formID)   
-#        self.dlg.repeatGroup.addItem(self.tr_repeatGroup)   
-#        self.dlg.odk_geometry.addItem(self.tr_odk_geometry)   
-#        self.dlg.attributeFilter.addItem(self.tr_attributeFilter)
-        #form list with index 0 as 'select form'
-        self.xmlFormId = []
-        self.xmlFormId.append(str(self.tr_formID))
-                
-        self.selected_projectID = str(self.dlg.projectID.currentText()).split('|')[0]
-        global form_url
-        form_url = (str(odk_url),"/v1/projects/",str(self.selected_projectID),"/forms/")
-        form_url = "".join(form_url)
-        self.dlg.progressBar.setRange(0,0)
-        self.dlg.progressBar.setTextVisible(False)
-        form_response = requests.get(str(form_url), headers = {"Authorization": "Bearer " + session_token},)
+        # Auto-pilot settings file management
+        if hasattr(self.dlg, 'btnSelectConfig'):
+            self.dlg.btnSelectConfig.clicked.connect(self.interface.select_auto_pilot_file)
+        if hasattr(self.dlg, 'btnSaveConfigAs'):
+            self.dlg.btnSaveConfigAs.clicked.connect(lambda: self.interface.create_auto_pilot_file('config'))
+        if hasattr(self.dlg, 'btnConfigInfo'):
+            self.dlg.btnConfigInfo.clicked.connect(self.interface.show_config_file_info)
+        if hasattr(self.dlg, 'copy_central_settings'):
+            self.dlg.copy_central_settings.clicked.connect(self.interface.copy_central_settings)
+        if hasattr(self.dlg, 'GenerateKey'):
+            self.dlg.GenerateKey.clicked.connect(self.interface.get_quodkey)
 
-        if form_response.status_code == 200:
-            for formID in form_response.json():
-                self.xmlFormId.append(formID["xmlFormId"])
-                self.dlg.formID.addItem(str(formID["name"]))
-        self.dlg.progressBar.setRange(0,100)
-        self.existing_entity_lists() #check if there are entity lists associated with this project
+        # Action buttons
+        if hasattr(self.dlg, 'load_to_canvas'):
+            self.dlg.load_to_canvas.clicked.connect(lambda: self.interface.layerLoadQgis('manual'))
+        if hasattr(self.dlg, 'save_csv'):
+            self.dlg.save_csv.clicked.connect(self.interface.save_csv_file)
+        if hasattr(self.dlg, 'Attachments'):
+            self.dlg.Attachments.clicked.connect(self.interface.download_images)
+        if hasattr(self.dlg, 'run_auto_pilot'):
+            self.dlg.run_auto_pilot.clicked.connect(self.run_auto_pilot)
 
-    # ====================================================================================================
-    #List all repeat groups (if any) within the selected form and get the submission id table
-    def list_repeatGroup(self): # triggered by select form combo box
-        #(re)set dependent combo-boxes to clear and add default repeatGroup entry
-        #global keyID         #master set of submissions to compare 
-        self.keyID = []
-        self.dlg.repeatGroup.clear()
-        self.dlg.odk_geometry.clear()
-        self.dlg.attributeFilter.clear()
-        self.dlg.dataTable.clear()
-        self.repeatGroups = ""
-        self.dlg.repeatGroup.addItem(self.tr_repeatGroup) 
-        self.dlg.dataset.setCurrentIndex(0)
-        self.dlg.entity_status.clear()
-        iformID = self.xmlFormId[self.dlg.formID.currentIndex()]
+        # Close buttons
+        if hasattr(self.dlg, 'closeWindow'):
+            self.dlg.closeWindow.clicked.connect(self.dlg.reject)
+        if hasattr(self.dlg, 'closeWindow_2'):
+            self.dlg.closeWindow_2.clicked.connect(self.dlg.reject)
+        if hasattr(self.dlg, 'closeWindow_3'):
+            self.dlg.closeWindow_3.clicked.connect(self.dlg.reject)
+        if hasattr(self.dlg, 'closeWindow_4'):
+            self.dlg.closeWindow_4.clicked.connect(self.dlg.reject)
 
-        #Find repeats within selected form (if any)
-        self.dlg.progressBar.setRange(0,0)
-        self.dlg.progressBar.setTextVisible(False)
-        svc_url = (str(form_url),str(iformID),".svc")
-        svc_Response = requests.get("".join(svc_url), headers={"Authorization": "Bearer " + session_token},)
+        if hasattr(self.dlg, 'reset_dialog'):
+            self.dlg.reset_dialog.clicked.connect(lambda: self.interface.reset_dialog('reset'))
 
-        if svc_Response.status_code == 200:
-            self.dlg.repeatGroup.setEnabled(True)
-            subFormData = svc_Response.json()['value']
-            for sfd in subFormData:
-                if sfd["url"] == "Submissions":
-                    self.dlg.repeatGroup.addItem(self.tr_mainForm)
-                else:
-                    self.dlg.repeatGroup.addItem(sfd["url"])
-                    self.repeatGroups = self.repeatGroups + str(sfd['url'])+"; "
+        # CRS selector
+        if hasattr(self.dlg, 'crs'):
+            self.dlg.crs.setEnabled(True)
+            self.dlg.crs.setCrs(self.iface.mapCanvas().mapSettings().destinationCrs())
+        if hasattr(self.dlg, 'crs_2'):
+            self.dlg.crs_2.setEnabled(True)
+            self.dlg.crs_2.setCrs(self.iface.mapCanvas().mapSettings().destinationCrs())
 
-            if self.dlg.repeatGroup.count() == 2:# if there are no repeats select the main form and list_submissions
-                self.dlg.filterValue.setEnabled(True)
-                self.dlg.attributeFilter.setEnabled(True)
-            self.dlg.repeatGroup.setCurrentIndex(1)
-            self.list_submissions()
-        else:
-            self.dlg.repeatGroup.setEnabled(False) #if there are no submissions (avoids being able to select none
-            self.dlg.repeatGroup.clear()
-        self.dlg.progressBar.setRange(0,100)
-            
-    # ====================================================================================================
-    # Use API call to download submissions to a DataFrame
-    def get_Response(self,filter_url): #for form submissions (and entities from V1.2)
-        self.dlg.progressBar.setRange(0,0)
-        self.dlg.progressBar.setTextVisible(False)
-        odk_Response = requests.get("".join(filter_url), headers={"Authorization": "Bearer " + session_token},)
-        
-        if odk_Response.status_code == 200:            
-            odkJson = odk_Response.json()['value']
-            #Create global dataframe for the (normalised) Json data retrieved
-            df_ODK = pd.json_normalize(odkJson)      
-            df_ODK = df_ODK.assign(geom_from_ODK=None) #Add a column to convert ODK geometry to WKT
-            
-            self.dlg.odk_geometry.clear()
-            self.dlg.odk_geometry.addItem(self.tr_odk_geometry)  
-            self.dlg.odk_geometry.addItem(self.tr_table_only) 
-            self.dlg.odk_geometry.setCurrentIndex(0)
-            geomKeys = ["Point","LineString","Polygon"] # possible geometry types for submissions
-            geomName = ""
-            geomCol = list()
-            
-            headers = list(df_ODK) # get a list of the columns in the dataframe
-            #print(headers)
-            headings = list()
-            col_number = 0
-            #loop through column names and update for import to QGIS
-            for header in headers : 
-                if header.find('.') >-1:
-                    # look for geometry field (name, type, accuracy) and replace column name
-                    header = header.replace('.properties.','-')
-                    header = header.replace('.coordinates','-coordinates')
-                    df_ODK.rename(columns={df_ODK.columns[col_number]: header}, inplace=True)
-                    notnullindex = df_ODK[header].first_valid_index() #use this to identify data type (ignoring empty rows)
-                    #print(header, notnullindex)
-                    if notnullindex == None:
-                        notnullindex = 0 #convert null to 0
-
-                    if df_ODK.loc[notnullindex,header] in (geomKeys):
-                        geomType = df_ODK.loc[notnullindex,header]
-
-                    #add to list of possible geometry for combo box
-                        geomName = str(header.rsplit('.',1)[0])
-                        geomItem = str(geomName)+'--->'+str(geomType)
-                        self.dlg.odk_geometry.addItem(str(geomItem))
-
-                
-                if self.keyLevel in ('KEY','PARENT_KEY'):
-                    header = header.replace('__id','KEY') #submission / repeat id
-                elif self.keyLevel == 'ENTITY_KEY': #for entities
-                    header = header.replace('__id','ENTITY_KEY') #entity id
-                    header = header.replace('geometry','entity_geom') # collect entity geometry field - change the name to avoid conflict with QGIS
-                    if header == 'entity_geom':
-                        self.dlg.odk_geometry.addItem(str('entity_geom')) # does not add geometry type
-                header = header.replace('__Submissions-id','PARENT_KEY') # repeat link to parent submission
-                headings.append(header)
-                #print(header)
-                df_ODK.rename(columns={df_ODK.columns[col_number]: header}, inplace=True)
-                if df_ODK[header].dtype != 'float64':
-                    self.dlg.attributeFilter.addItem(header)
-                col_number +=1
-            if self.dlg.odk_geometry.count() <= 3: # if there is only one geometry field (or none) make default
-                self.dlg.odk_geometry.setCurrentIndex(self.dlg.odk_geometry.count()-1)
-                self.dlg.save_csv.setEnabled(True)
-                self.dlg.load_to_canvas.setEnabled(True)  
-                self.dlg.Attachments.setEnabled(True)
-
-            self.dlg.progressBar.setRange(0,100)
-            return df_ODK
-        else:
-            self.dlg.msg.setText(self.tr_check_server+ str(odk_Response.status_code))
-            self.dlg.progressBar.setRange(0,100)
-
-    # ===========================================================================================        
-
-    #List all Forms submissions
-    def list_submissions(self): # triggered by repeatGroup combo or as default if there are no repeats in the form
-        #(re)set dependent combo-boxes and set up default values
-
-        if self.dlg.repeatGroup.currentIndex() > 0:
-            self.dlg.dataset.setCurrentIndex(0)
-            self.dlg.progressBar.setRange(0,0)
-            self.dlg.progressBar.setTextVisible(False)
-            self.dlg.attributeFilter.clear()     
-            self.dlg.attributeFilter.addItem(self.tr_attributeFilter)
-            self.dlg.entities_frame.setStyleSheet("background: none") 
-            self.dlg.submissions_frame.setStyleSheet("background: #B4B4B4")
-            iformID = self.xmlFormId[self.dlg.formID.currentIndex()]
-            sel_repeatGroup = self.dlg.repeatGroup.currentText()
-
-            self.filterDateS = str("__system/submissionDate ge " + str(self.strSdate))
-            self.filterDateE = str("__system/submissionDate le " + str(self.strEdate))
-
-            if sel_repeatGroup == self.tr_mainForm: # fetch main form and create dataframe
-                self.keyLevel = "KEY"
-                if self.dlg.load_all.isChecked():
-                    filter_url = (form_url,str(iformID),".svc/Submissions")# get all submissions for this form
-                else:
-                    filter_url = (form_url,str(iformID),".svc/Submissions?$filter=",self.filterDateS," and ",self.filterDateE)
-                #print(filter_url)
-                self.df_submissions = self.get_Response(filter_url)
-                submissionsTotal = self.df_submissions.shape[0]
-                #print(submissionsTotal)
-                self.dlg.attributeFilter.setEnabled(True)
-                self.dlg.filterExclude.setEnabled(True)
-                self.dlg.filterExclude.setCheckable(True)
-
-                self.changeFilterState()
-                try:
-                    self.AttachmentsTotal = self.df_submissions['__system.attachmentsPresent'].sum()
-                except:
-                    self.AttachmentsTotal = 0
-                
-                #check whether there are any submissions in the date range
-                if submissionsTotal == 0:   
-                    self.dlg.msg.setStyleSheet("background: orange")
-                    self.dlg.msg.setText(self.tr_submissions_found + str(0))
-                    self.dlg.dataTable.clear()
-                else:
-                    #print('there are ',submissionsTotal,' submissions')
-                    self.keyID = list(self.df_submissions['KEY'])
-                    self.dlg.msg.setStyleSheet("background: cyan")
-                    self.dlg.msg.setText('')
-                    self.updateTable(self.df_submissions) #load the dataframe to the Qtable
-
-            else: #  or create a dataframe with rows from repeat within the date range ($root/Submissions)
-                self.keyLevel = "PARENT_KEY"
-                if self.dlg.load_all.isChecked():
-                    filter_url = (form_url,str(iformID),".svc/",str(sel_repeatGroup))
-                else:
-                    filter_url = (form_url,str(iformID),".svc/",str(sel_repeatGroup),"?$filter=$root/Submissions/",self.filterDateS," and $root/Submissions/",self.filterDateE)
-                self.df_repeat = self.get_Response(filter_url)
-                #print(self.df_repeat.head())
-                self.dlg.filterValue.setEnabled(False)
-                self.dlg.attributeFilter.setEnabled(False)
-                self.df_repeat = self.df_repeat[self.df_repeat[self.keyLevel].isin(self.keyID)]
-                #print(self.keyLevel, self.keyID,self.df_repeat.head())
-                self.updateTable(self.df_repeat)    #load the dataframe to the Qtable
-                self.Check_ColumnName(self.df_repeat)
-                #if self.underScoreMessage:
-                #    self.dlg.msg.append(self.underScoreMessage) 
-            self.dlg.Attachments.setEnabled(True)
-            self.dlg.ignore_nogeom.setEnabled(True)
-            self.dlg.remove_groups.setEnabled(True)
-            self.dlg.progressBar.setRange(0,100)
-
-    # ====================================================================================================
-    # since v1.2 also filters Entities if relevant
-    def filter_items(self): # triggered by attributeFilter combo
-        if self.keyLevel == "KEY":
-            df_filter = self.df_submissions
-        elif self.keyLevel == "ENTITY_KEY":
-            df_filter = self.df_entities
-        else:
-            pass
-        attributeFilter = self.dlg.attributeFilter.currentText()
-        #self.dlg.clearFilter.setEnabled(True)
-        if attributeFilter != self.tr_attributeFilter:
-            uniqueValues = df_filter[attributeFilter].unique().tolist()
-            #print(uniqueValues)
-            self.dlg.filterValue.setEnabled(True)
-            self.dlg.filterValue.clear()
-            self.dlg.filterValue.addItem(self.tr_filterValues)
-            for u in uniqueValues:
-                if u is None:
-                    #self.dlg.filterValue.addItem("")
-                    #TODO: allow filtering of null values
-                    pass
-                else:
-                    self.dlg.filterValue.addItem(str(u))
-    
-    # ====================================================================================================
-    
-    def filter_Value(self): #triggered by filterValue combo - only active for main form / entities - runs straight to set_geometry
-
-        self.dlg.clearFilter.setEnabled(True)
-        self.set_geometry()
-
-    # ====================================================================================================
-    def clearFilter(self):
-        self.dlg.clearFilter.setEnabled(False)
-        self.dlg.attributeFilter.setCurrentIndex(0)
-        self.dlg.filterValue.clear()
-        self.set_geometry()
-
-    # ====================================================================================================
-    def changeFilterState(self):
-        #isChecked - change the label when active
-        if self.dlg.filterExclude.isChecked():
-            self.dlg.filterExclude.setText("Exclude")
-        else:
-            self.dlg.filterExclude.setText("Include")
-        self.set_geometry()
-        
-    # ====================================================================================================
-    # select the geometry column from those detected in the submission
-    def set_geometry(self): #triggered by geometry combo box or when Filter is selected
-        self.reset_msg()
-        if self.keyLevel == "KEY":
-            df_setgeom = self.df_submissions
-        elif self.keyLevel == "ENTITY_KEY":
-            df_setgeom = self.df_entities
-        elif self.keyLevel == "PARENT_KEY":   #use repeat dataframe
-            df_setgeom = self.df_repeat
-            
-        if self.keyLevel in ("KEY", "ENTITY_KEY"):     #get any filter
-            filterValue = str(self.dlg.filterValue.currentText())
-            #TODO - allow filtering of empty / null values
-            attributeFilter = str(self.dlg.attributeFilter.currentText())
-            if self.dlg.filterValue.currentIndex() > 0:
-                if self.dlg.filterExclude.isChecked():
-                    df_setgeom = df_setgeom[df_setgeom[attributeFilter] != filterValue]
-                else:
-                    df_setgeom = df_setgeom[df_setgeom[attributeFilter] == filterValue]              
-        
-
-
-        if self.dlg.odk_geometry.currentIndex() >1: 
-            geomType = self.dlg.odk_geometry.currentText()
-            if self.keyLevel != "ENTITY_KEY": # entities geometry type is not determined until loaded (saves query to server)
-                geomCol = str(str(geomType).split("--->")[0])+'-coordinates'
-            else:
-                geomCol = geomType
-            #print(geomCol)
-            if self.dlg.ignore_nogeom.isChecked():
-                pass
-            else:
-                df_setgeom =df_setgeom.dropna(subset=[geomCol])
-            
-
-        self.updateTable(df_setgeom)
-        if self.dlg.odk_geometry.currentIndex() >0:
-            self.dlg.save_csv.setEnabled(True)
-            self.dlg.load_to_canvas.setEnabled(True)
-            if self.keyLevel != "ENTITY_KEY":
-                self.dlg.Attachments.setEnabled(True)
-            else:
-                self.dlg.Attachments.setEnabled(False) # no attachments with entities so disable button
-        else:
+        # Initial button states
+        if hasattr(self.dlg, 'attributeFilter'):
+            self.dlg.attributeFilter.setEnabled(False)
+        if hasattr(self.dlg, 'attributeFilter_2'):
+            self.dlg.attributeFilter_2.setEnabled(False)
+        if hasattr(self.dlg, 'valueFilter'):
+            self.dlg.valueFilter.setEnabled(False)
+        if hasattr(self.dlg, 'valueFilter_2'):
+            self.dlg.valueFilter_2.setEnabled(False)
+        if hasattr(self.dlg, 'filterExclude'):
+            self.dlg.filterExclude.setEnabled(False)
+        if hasattr(self.dlg, 'filterExclude_2'):
+            self.dlg.filterExclude_2.setEnabled(False)
+        if hasattr(self.dlg, 'Attachments'):
+            self.dlg.Attachments.setEnabled(False)
+        if hasattr(self.dlg, 'Attachments_2'):
+            self.dlg.Attachments_2.setEnabled(False)
+        if hasattr(self.dlg, 'save_csv'):
             self.dlg.save_csv.setEnabled(False)
-            self.dlg.load_to_canvas.setEnabled(False)  
-            self.dlg.Attachments.setEnabled(False)            
-
-    # ====================================================================================================
-   
-    # update dataTable after combo box selections
-    def updateTable(self, df_table):
-        self.dlg.dataTable.clear()
-        if df_table.shape[0] == 0:
-            return
-        else:
-            headings = list(df_table)
-            
-            self.dlg.dataTable.setRowCount(df_table.shape[0])
-            self.dlg.dataTable.setColumnCount(df_table.shape[1])
-            self.dlg.dataTable.setHorizontalHeaderLabels(headings)
-            i=0
-            self.headFont.setBold(True)
-            for heading in headings:
-                if '_' in heading and '__' not in heading and 'base_version' not in heading:  
-                    self.dlg.dataTable.horizontalHeaderItem(i).setFont(self.headFont)
-                i +=1
-            self.dlg.dataTable.resizeColumnsToContents()
-            # convert dataframe to array before populating table
-            df_array = df_table.values
-            for row in range(df_table.shape[0]):
-                for col in range(df_table.shape[1]):
-                    self.dlg.dataTable.setItem(row, col, QTableWidgetItem(str(df_array[row,col])))
-                    
-            if self.keyLevel == "KEY":
-                self.filterID = list(df_table['KEY'])
-                try:
-                    self.AttachmentsTotal = df_table['__system.attachmentsPresent'].sum()
-                    self.dlg.msg.setText(self.tr_submissions_found + str(df_table.shape[0])+" ("+str(self.AttachmentsTotal)+" attachments)\nSubsets (ODK_repeats): "+str(self.repeatGroups))
-                except:
-                    self.dlg.msg.setText(self.tr_submissions_found + str(df_table.shape[0])+" in: "+str(self.repeatGroups)+ "(ODK_repeat)")
-                #print (self.filterID)
-            if self.keyLevel == "PARENT_KEY":
-                self.filterID = list(df_table['PARENT_KEY'])
-                self.dlg.msg.setText(self.tr_submissions_found + str(df_table.shape[0])+" in: "+str(self.repeatGroups)+ "(ODK_repeat)")
-            if self.keyLevel == "ENTITY_KEY":
-                self.filterID = list(df_table['ENTITY_KEY'])
-                self.dlg.msg.setText(self.tr_entities_found + str(df_table.shape[0]))
-            
-    #===========================================================
-    # Working with time zones - Central stores everything UTC! Needs to work for Windows without dependencies
-    def timeaware (self,base_time):
-        ## ZoneInfo doesn't work well on windows hence the workaround - other options have dependencies
-        try:
-            utc_zone = ZoneInfo('UTC')
-            local_zone = ZoneInfo('localtime')
-
-        ## Convert the UTC time to local time
-            utc_time = base_time.replace(tzinfo=utc_zone)
-            local_time = utc_time.astimezone(local_zone)
-            time_diff = utc_time - local_time
-            
-        except: # not perfect!!! can't account for DST in past dates but will be consistent
-            utc_time = datetime.now(timezone.utc)
-            local_time = datetime.now().astimezone()
-            time_diff = utc_time - local_time
-            
-        base_diff = base_time.toPyDateTime() - time_diff
-        #print(utc_time, local_time, time_diff)
-        #print(base_time.toPyDateTime(), base_diff)
-        
-        return base_diff
-
-
-    # ====================================================================================================
-    #(re)load the date filter
-    def onDateChanged(self): # triggered by changing either start or end date combo
-        self.dlg.load_all.setChecked(False)
-
-        sDate = self.timeaware(self.dlg.DateStart.dateTime())
-        eDate = self.timeaware(self.dlg.DateEnd.dateTime()) + timedelta(hours=23,minutes=59,seconds=59.99) #make the end date the end of the given day (converted to UTC)
-        if  sDate > eDate:  #check dates are a real range
-            self.dlg.msg.setText(self.tr_date_error)
-        #translate PyDateTime to API readable string 
-        self.strSdate = str(sDate).replace(" ","T")+"Z"
-        self.strEdate = str(eDate).replace(" ","T")+"Z"
-
-        self.DateUpdate()
-
-    # ===================================================================================================
-    #update the combo-boxes accordingly (called when dates change or load-all checked/unchecked)
-    def DateUpdate (self): 
-        self.dlg.attributeFilter.setCurrentIndex(0)
-        self.dlg.filterValue.clear()
-        if self.dlg.formID.currentIndex() > 0:
-            self.list_submissions()
-        elif self.dlg.dataset.currentIndex() > 0:
-            self.list_Entities()
-        else:
-            self.dlg.repeatGroup.setCurrentIndex(0)
-            self.dlg.odk_geometry.setCurrentIndex(0)
-            #self.dlg.attributeFilter.setCurrentIndex(0)
-            self.dlg.entity_status.setCurrentIndex(0)
-    # ====================================================================================================
-    def crs(self):
-
-        crsId = str(self.dlg.crs.CrsOption())
-
-    
-    # ====================================================================================================    
-    # Load layer with all attributes using normalised json as dataframe
-    def layerLoadQgis(self):
-        self.dlg.progressBar.setRange(0,0)
-        self.dlg.progressBar.setTextVisible(False)
-        if self.keyLevel == "KEY":     
-            df_layer = self.df_submissions
-            df_layer = df_layer[df_layer['KEY'].isin(self.filterID)]
-            LayerName = 'TMP_'+self.dlg.formID.currentText().split('|')[0]
-        elif self.keyLevel == "PARENT_KEY":
-            df_layer = self.df_repeat
-            df_layer = df_layer[df_layer['PARENT_KEY'].isin(self.filterID)]
-            LayerName = 'TMP_'+self.dlg.formID.currentText().split('|')[0]+'_'+self.dlg.repeatGroup.currentText().split(".")[1]
-        elif self.keyLevel == "ENTITY_KEY":
-            df_layer = self.df_entities
-            df_layer = df_layer[df_layer['ENTITY_KEY'].isin(self.filterID)]
-            LayerName = 'ENTITY_'+self.dlg.dataset.currentText().split('|')[0]+'_'+ self.dlg.entity_status.currentText()
-        # Removed rows that have been filtered out above and reset the index
-
-        df_layer.index = range(len(df_layer.index))
-        #print (self.filterID)
-        #print(df_layer.head())
-        if self.dlg.odk_geometry.currentText() == self.tr_odk_geometry: # stop if no geometry type selected
-            self.dlg.msg.setText(self.tr_select_form_repeat)
-            self.dlg.msg.setStyleSheet("background: orange")
-        else: 
-
-            filterValue = str(self.dlg.filterValue.currentText())
-            attributeFilter = self.dlg.attributeFilter.currentText()
-
-            geomType = self.dlg.odk_geometry.currentText()
-            if geomType == self.tr_table_only:
-                layerGeom = "NOGEOMETRY"
-                geomName = ""
-                geomCol = "geom_from_ODK"
-            else:
-                if self.keyLevel == "ENTITY_KEY": # set up the geometry for Entities
-                    geomName = str(geomType) 
-                    geomCol = str(geomType)
-
-                    layerGeom = ""
-                else: # set up the geometry for submissions
-                    layerGeom = str(str(geomType).split("--->")[-1:][0])
-                    geomName = str(str(geomType).split("--->")[0])
-                    geomCol = str(geomName + '-coordinates')
-                if self.dlg.ignore_nogeom.isChecked() == False:
-                #    df_layer_all = df_layer #keep all rows including those without geometry
-                    df_layer = df_layer.dropna(subset=[geomCol])
-                    df_layer.index = range(len(df_layer.index))
-
-            self.construct_geometry(df_layer,layerGeom, geomName, geomCol)
-            if self.keyLevel == "ENTITY_KEY":
-                layerGeom = self.entityGeom
-            #print(layerGeom)
-            # Create QgsVectorLayer with appropriate geometry (or just a table if there is no geometry)
-            for geoms in layerGeom.split():
-                df_splitlayer = df_layer[df_layer['geom_from_ODK'].str.contains(geoms.upper())]
-                df_splitlayer.index = range(len(df_splitlayer.index))
-
-                crs = self.dlg.crs.crs()
-                projection = QgsCoordinateReferenceSystem.authid(crs)
-                if geoms == "NOGEOMETRY":
-                    LayerType = str("POINTZM?crs=" + str(projection))
-                    LayerName +='_NoGeom'
-                else:
-                    LayerType = str(str(geoms.upper())+"ZM?crs=" + str(projection))
-                temp = QgsVectorLayer(LayerType,LayerName,"memory")
-                temp_data = temp.dataProvider()
-                temp.startEditing()
-                # Create  fields in dataProvider - QMetaType type according to dtype in dataframe [updated from QVariant which was depreciated in 3.38]
-                headers = list(df_splitlayer)
-                ignoregeom = ["geom_from_ODK", "entity_geom", "geometry"]
-                col_number = 0
-                for header in headers : 
-                    #print(header)
-                    if header not in ignoregeom:  #don't add the WKT column - it is redundant (and may not be in the correct CRS so could cause confusion) and ignore any column called geometry (ODK source likely csv or entity) as it causes trouble with QGIS
-
-                        datatype= df_splitlayer[header].dtype
-
-                        #ensure the fields are the correct QGIS type to receive the data (string, int or double)
-                        if datatype == 'object':
-                            temp_data.addAttributes([QgsField(header,QMetaType.QString)])
-                        if datatype == 'int64':
-                            temp_data.addAttributes([QgsField(header,QMetaType.Int)])
-                        elif datatype == 'float64':
-                            temp_data.addAttributes([QgsField(header,QMetaType.Double, 'double', 20, 3)]) #length 20, precision 3
-                        else:
-                            temp_data.addAttributes([QgsField(header,QMetaType.QString)])
-                    col_number+=1   
-                temp.updateFields()
-
-                # Populate the layer by iterating through the dataframe
-                #if self.dlg.ignore_nogeom.isChecked(): #revert to all rows including where geometry is null
-                #    df_splitlayer = df_splitlayer_all
-                headers = list(df_splitlayer) 
-
-                # Add features with the given geometry
-
-                for i,row in df_splitlayer.iterrows():
-                    if str(geoms) == "NOGEOMETRY": 
-                        geom =""
-                    else:
-                        geom = df_splitlayer.loc[i, 'geom_from_ODK']
-                    #print(geom)
-                    f = QgsFeature()
-                    #this allows transformation to selected CRS
-                    base_geom = QgsGeometry.fromWkt(geom)
-                    sourceCrs = QgsCoordinateReferenceSystem("EPSG:4326")
-                    destCrs = crs
-                    tr = QgsCoordinateTransform(sourceCrs, destCrs, QgsProject.instance())
-                    if str(geoms) == "NOGEOMETRY": 
-                        pass
-                    else:
-                        base_geom.transform(tr)
-                    #print(base_geom)
-                    f.setGeometry(base_geom)
-                    temp_data.addFeatures([f])
-                    temp.commitChanges()
-                    temp.updateFields()
-                    temp.updateExtents()
-                
-                # Populate the attribute table for each feature
-                features = temp.getFeatures()
-                count=0
-                headers = list(df_splitlayer)
-                for feature in features:
-                    for header in headers:
-                        if header not in ignoregeom: #don't include the WKT column - it is redundant and ignore the imported geometry column
-                            with edit(temp):
-                                datatype= df_splitlayer[header].dtype
-                                #print(count,header, datatype)
-                                #insert feature with the appropriate data type
-                                attributeValue = df_splitlayer.loc[count,header]
-                                if attributeValue == None:
-                                    pass
-                                else:
-                                    if datatype == 'object':
-                                        attributeValue = str(attributeValue)
-                                    else:
-                                        if isnan(attributeValue): # change nan to None / Null
-                                            attributeValue = None
-                                        else:
-                                            attributeValue = float(attributeValue)
-                                #print(attributeValue,datatype)
-                                feature[header] = attributeValue
-                                temp.updateFeature(feature)
-                    count+=1
-                temp.commitChanges()
-
-                QgsProject.instance().addMapLayer(temp)   
-            self.dlg.msg.setText(self.tr_layer_added + projection)
-            self.dlg.msg.setStyleSheet("background: DarkSeaGreen")
-            self.dlg.progressBar.setRange(0,100)
-
-
-
-    # ====================================================================================================
-    #download the filtered list of images from the main form  
-    def download_images(self):               
-
-        df_attach = self.df_submissions
-        odk_username = self.dlg.odk_username.text()
-        odk_pass = self.dlg.odk_pass.text()
-        formID = self.xmlFormId[self.dlg.formID.currentIndex()]
-        df_attach = df_attach[df_attach['KEY'].isin(self.filterID)]
-        count = 0
-        #--------------------------------------------------------
-        aFolder = QFileDialog.getExistingDirectory(None, self.tr_image_folder)
-        if aFolder:
-            self.dlg.progressBar.setRange(0,100)
-            self.dlg.progressBar.setTextVisible(True)
-            #iterate through the instances (which may be filtered) and collate the attachments
-            try:
-                for i,iData in df_attach.iterrows():  
-                    InstanceID = df_attach.loc[i, 'meta.instanceID']
-                    attach_url = (form_url,formID,"/submissions/",str(InstanceID),"/attachments")
-                    attach_url = "".join(attach_url)
-                    attach_url_Response = requests.get(attach_url, headers={"Authorization": "Bearer " + session_token}, )
-                    if attach_url_Response.status_code == 200:
-                        #set up a dataframe for the attachments in each instance nd then iterate through, downloading as you go!
-                        attachJson = attach_url_Response.json()
-                        df_attachments = pd.json_normalize(attachJson)
-                        for i,iData in df_attachments.iterrows():
-                            progress = int((count+1)/ self.AttachmentsTotal*100)
-                            self.dlg.progressBar.setValue(progress)
-                            filename = df_attachments.loc[i,'name']
-                            source_url = attach_url+'/'+ filename
-                            destination = aFolder+'/'+ filename
-                            streamImage = requests.get(source_url, auth = (odk_username,odk_pass), stream=True, allow_redirects=True)
-                            streamImageHead = streamImage.headers.get('content-type')
-                            f = open(destination, 'wb')
-                            f.write(streamImage.content)
-                            f.close()
-                            count +=1
-
-
-                self.dlg.msg.setText(str(self.AttachmentsTotal)+' downloaded to '+ aFolder)
-                self.dlg.msg.setStyleSheet("background: DarkSeaGreen")
-                QgsExpressionContextUtils.setProjectVariable(QgsProject.instance(), 'ODK_image_path',aFolder)
-              # Add a project variable called Image - for attribute form viewing of images
-                       
-            except:
-                self.dlg.msg.setText(self.tr_attachments_error)
-                self.dlg.msg.setStyleSheet("background: red")
-
-
-    # ====================================================================================================
-    # write filtered DataFrame to CSV 
-    def saveCSV(self): 
-        if self.dlg.odk_geometry.currentText() == self.tr_odk_geometry:
-            self.dlg.msg.setText(self.tr_select_form_repeat)
-            self.dlg.msg.setStyleSheet("background: orange")
-        else: 
-            self.dlg.progressBar.setRange(0,0)
-            self.dlg.progressBar.setTextVisible(False)
-            if self.keyLevel == "ENTITY_KEY":
-                iformID = self.dataset[self.dlg.dataset.currentIndex()]
-            else:
-                iformID = self.xmlFormId[self.dlg.formID.currentIndex()]
-            csvFilename, fileType = QFileDialog.getSaveFileName(None,'Select filename for ' + iformID,iformID,"*.csv")  
-            #print(csvFilename, fileType)
-            #Once the file is saved, remove rows that have been filtered out from dataframe and load to canvas
-            if csvFilename:
-                if self.keyLevel == "KEY":
-                    df_layer = self.df_submissions
-                    df_layer = df_layer[df_layer['KEY'].isin(self.filterID)]
-                elif self.keyLevel == "PARENT_KEY":
-                    df_layer = self.df_repeat
-                    df_layer = df_layer[df_layer['PARENT_KEY'].isin(self.filterID)]
-                elif self.keyLevel == "ENTITY_KEY":
-                    df_layer = self.df_entities
-                    df_layer = df_layer[df_layer['ENTITY_KEY'].isin(self.filterID)]
-                df_layer.to_csv(str(csvFilename)) 
-                geomType = self.dlg.odk_geometry.currentText()
-                self.dlg.msg.setText(self.tr_csv_exported + str(csvFilename))
-                self.load_csv_to_canvas(df_layer,geomType,csvFilename)
-            else:
-                self.dlg.msg.setText(self.tr_select_filepath)
-                self.dlg.msg.setStyleSheet("background: red")
-
-        self.dlg.progressBar.setRange(0,100)
- 
-    # ====================================================================================================
-    #Generate geometry and file format to load into canvas (at EPSG:4326) - not currently working for exported Entity Lists
-    def load_csv_to_canvas(self, df_layer, geomType,csvFilename):
-        projection = "EPSG:4326"            
-        if geomType == self.tr_table_only:
-            layerGeom = "NOGEOMETRY"
-            projection = "table only - no projection"
-            #geomCol = "geom_from_ODK"
-            uri = 'file:///{}?delimiter=,'.format(csvFilename)
-        else:
-            if self.keyLevel in ("KEY", "PARENT_KEY"):
-                layerGeom = str(str(geomType).split("--->")[-1:][0])
-                geomName = str(str(geomType).split("--->")[0])
-                geomCol = str(geomName + '-coordinates')
-                uri ='%s?delimiter=%s&crs=%s&wktField=%s' % (str("file:///"+csvFilename), ",", projection, "geom_from_ODK")
-            elif self.keyLevel == "ENTITY_KEY":
-                layerGeom = str(geomType)
-                geomName = str(geomType)
-                geomCol = str(geomType)
-
-                uri ='%s?delimiter=%s&crs=%s&wktField=%s' % (str("file:///"+csvFilename), ",", projection, geomName)
-            self.construct_geometry(df_layer,layerGeom, geomName, geomCol)
-            
-        csvName = os.path.splitext(os.path.basename(csvFilename))[0]
- 
-
-        #print(csvName, uri)
-        NewLayer = QgsVectorLayer(uri, csvName, 'delimitedtext')         
-        QgsProject.instance().addMapLayer(NewLayer) 
-        self.dlg.msg.setText(self.tr_layer_added + projection)
-        self.dlg.msg.setStyleSheet("background: DarkSeaGreen")
-                                                 
-
-    # ====================================================================================================
-    # take the selected Geometry column and convert to 4D WKT format (e.g. POINTZM / LINESTRINGZM / POLYGONZM)
-    def construct_geometry(self,df_layer, layerGeom, geomName, geomCol):
-        if self.keyLevel == "ENTITY_KEY":
-            self.construct_entity_geometry(df_layer,geomCol)
-        else:
-            for i,iData in df_layer.iterrows():  
-                #this could be shortened by combining Linestring and Polygon (the routine is identical except for self.WKT)
-                iValues = df_layer.loc[i, geomCol]
-                if iValues is None:
-                    self.WKT = ""
-                else:
-                    #Convert to table only           
-                    if str(layerGeom) == "NOGEOMETRY": 
-                        self.WKT = "NOGEOMETRY"
-                    
-                    #Convert to Point WKT 
-                    if str(layerGeom) == "Point": 
-                        m = str(df_layer.loc[i, str(geomName+'-accuracy')])
-                        #iValues = df_layer.loc[i, geomCol]
-                        if type(iValues) is list:
-                            XYZ = " ".join(map(str, iValues))
-                            self.WKT = ("POINTZM (" + XYZ + " " + m +")")  
-                        else:
-                            self.WKT = ""
-
-                    #--------------------------------------------------------
-                    #Convert to LineString WKT                
-                    if str(layerGeom) == "LineString":
-                        #iValues = df_layer.loc[i, geomCol] 
-                        if type(iValues) is list:                        
-                            c = ""
-                            for a in iValues:
-                                b = ("".join(str(a))[1:][:-1]).replace(",", "")
-                                if len(a) == 2:
-                                    c = c + ", " + b + " 0 0"
-                                elif len(a) == 3:
-                                    c = c + ", " + b + " 0"
-                                else:
-                                    c = c + ", " + b
-                                
-
-                            #print("a: ",a,"\nb:",b,"\nc:",c)
-                            XYZ = c[1:]                                
-                            self.WKT = ("LINESTRINGZM (" + XYZ +")")
-                        else:
-                            self.WKT = ""
-                    #--------------------------------------------------------
-                    #Convert to Polygon WKT
-                    if  str(layerGeom)  == "Polygon":                           
-                        #iValues = df_layer.loc[i, geomCol] 
-                        #print(iValues)
-                        if type(iValues) is list:  
-                            c = ""
-                            for a in iValues[0]:
-                                b = ("".join(str(a))[1:][:-1]).replace(",", "")
-                                if len(a) == 2:
-                                    c = c + ", " + b + " 0 0"
-                                elif len(a) == 3:
-                                    c = c + ", " + b + " 0"
-                                else:
-                                    c = c + ", " + b
-                            XYZ = c[1:]
-                            self.WKT = ("POLYGONZM ((" + XYZ + "))")
-                        else:
-                            self.WKT = ""
-                #--------------------------------------------------------
-                #print (iValues, self.WKT)
-                    
-                #Add geometry to dataframe
-                df_layer.loc[i, 'geom_from_ODK'] = str(self.WKT)
-                #print(df_layer.loc[i, 'geom_from_ODK'])
-        return df_layer
-
-
-
-    # ====================================================================================================
-    #  #From v1.2: Entities and Entity List management 
-    #
-    # ====================================================================================================
-    
-    # create list of existing entity lists via API
-    def existing_entity_lists(self):
-        self.dlg.dataset.clear()
-        self.dlg.entity_status.clear()
-        self.dlg.dataset.addItem(self.tr_selectdataset)
-        self.dataset = []
-        self.dataset.append(str(self.tr_dataset))
-        self.dlg.entities_frame.setStyleSheet("background: none")
-
-        self.selected_projectID = str(self.dlg.projectID.currentText()).split('|')[0]
-        global dataset_url
-        dataset_url = (str(odk_url),"/v1/projects/",str(self.selected_projectID),"/datasets/")
-        dataset_url = "".join(dataset_url)
-        self.dlg.progressBar.setRange(0,0)
-        self.dlg.progressBar.setTextVisible(False)
-        dataset_response = requests.get(str(dataset_url), headers = {"Authorization": "Bearer " + session_token},)
-
-        if dataset_response.status_code == 200:
-            for ds in dataset_response.json():
-                self.dataset.append(ds["name"])
-                self.dlg.dataset.addItem(str(ds["name"]))
-            if self.dlg.dataset.count() >1:
-                self.dlg.dataset.setEnabled(True)
-                self.dlg.label_dataset.setEnabled(True)
-                self.dlg.label_entityStatus.setEnabled(True)
-            else:
-                self.dlg.dataset.clear()
-                self.dlg.dataset.addItem(self.tr_no_datasets)
-                self.dlg.dataset.setEnabled(False)
-                self.dlg.label_dataset.setEnabled(False)
-                self.dlg.label_entityStatus.setEnabled(False)
-        self.dlg.progressBar.setRange(0,100)
-
-    # ====================================================================================================
-    def select_entity_list(self):
-        if self.dlg.entity_status.count() == 0:
-            for sts in self.tr_entitystatus:
-                self.dlg.entity_status.addItem(sts)
-        self.dlg.entity_status.setCurrentIndex(0)
-        self.dlg.repeatGroup.clear()
-        self.dlg.formID.setCurrentIndex(0)
-        self.dlg.entity_status.setEnabled(True)
-        self.dlg.dataset.setEnabled(True)
-        self.dlg.entities_frame.setStyleSheet("background: #B4B4B4")
-        self.dlg.submissions_frame.setStyleSheet("background: none")    
-    # ====================================================================================================    
-    def list_Entities(self): #triggered by entity_status combo
-        if self.dlg.entity_status.currentIndex() > 0:
-            self.keyLevel = "ENTITY_KEY"
-            #self.dlg.formID.setCurrentIndex(0)
-            #create global date range filter - either for new or updated entities
-            if self.dlg.entity_status.currentText() == self.tr_entitystatus[1]:
-                self.filterEntityS = str("__system/createdAt ge " + str(self.strSdate))
-                self.filterEntityE = str("__system/createdAt le " + str(self.strEdate))
-            elif self.dlg.entity_status.currentText() == self.tr_entitystatus[2]:
-                self.filterEntityS = str("__system/updatedAt ge " + str(self.strSdate))
-                self.filterEntityE = str("__system/updatedAt le " + str(self.strEdate))  
-                
-            if self.dlg.load_all.isChecked():
-                filter_url = (dataset_url,str(self.dlg.dataset.currentText()),".svc/Entities")
-            else:
-                filter_url = (dataset_url,str(self.dlg.dataset.currentText()),".svc/Entities?$filter=",self.filterEntityS," and ",self.filterEntityE)
-            #print(filter_url)
-            self.df_entities = self.get_Response(filter_url)
-            #if self.df_entities:
-            entitiesTotal = self.df_entities.shape[0]
-            
-            #check whether there are any entities in the date range
-            if entitiesTotal == 0:   
-                self.dlg.msg.setStyleSheet("background: orange")
-                self.dlg.msg.setText(self.tr_entities_found + str(0))
-                self.dlg.dataTable.setRowCount(0)
-                self.dlg.dataTable.setColumnCount(0)
-
-            else:
-                self.dlg.msg.setStyleSheet("background: cyan")
-                self.dlg.attributeFilter.setEnabled(True)
-                self.dlg.filterExclude.setEnabled(True)
-                self.dlg.filterExclude.setCheckable(True)
-                self.dlg.msg.setText('')
-                self.changeFilterState()
-                self.dlg.ignore_nogeom.setEnabled(True)
-                self.dlg.formID.setCurrentIndex(0)
-
-    # ====================================================================================================    
-    # for adding geometry column if stored in the Entity properties - write as 4D WKT format (e.g. POINTZM / LINESTRINGZM / POLYGONZM)
-    # v1.3 - generate layers for each geomtype if entity has mixed geometries
-    
-    def construct_entity_geometry (self,df_layer,geomCol):
-        geomTypes = ''
-        for i,iData in df_layer.iterrows():
-
-            iValues = df_layer.loc[i, geomCol]
-            if iValues:
-                #print('Raw: ', iValues)
-                vertices = iValues.split(";")
-                c=""
-
-                if len(vertices) == 1:
-                    geomType = "POINT"
-                elif vertices[0] == vertices[-1].lstrip(' '):
-                    geomType = "POLYGON"
-                else:
-                    geomType = "LINESTRING"
-                for a in vertices:
-                    a=a.lstrip(' ') #remove any leading spaces if the format is '; vertex' rather than ';vertex'
-                    #print('vertex: ', a)
-                    coords = a.split(" ")
-                    #print('coords: ',coords)
-                    b = coords[1] + " " + coords[0] + " " + coords[2] + " " + coords[3] # convert lat lon alt acc; to xyzm
-                    c = c + ", " + b
-                XYZ = c[1:]
-                #print ('XYZ: ',XYZ)
-                self.WKT = (geomType + "ZM ((" + XYZ +"))")
-                 #Add geometry to dataframe
-                 #differentiate between downloaded Entity list and exported QGIS entity list
-                 
-                df_layer.loc[i, 'geom_from_ODK'] = str(self.WKT)
-                #print('WKT: ',self.WKT)
-            else:
-                geomType = "NOGEOMETRY"
-                df_layer.loc[i, 'geom_from_ODK'] = 'NOGEOMETRY'
-            #print(geomType)
-            if geomType not in geomTypes:
-                geomTypes += str(geomType + ' ')
-        self.entityGeom = geomTypes
-        #print(self.entityGeom)
-        return df_layer
-        
-    # ==================================================================================================== 
-    # ====================================================================================================
-    # Entity Management Tab
-    
-    def populateLayers(self): #QGIS layers to combo box
-
-        self.selected_projectID_entity = ""
-        self.entityCsvFilename = ""
-        #self.df_export_entities = pd.DataFrame()
-        self.map_layers = QgsProject.instance().mapLayers().values()
-        #print(self.map_layers)
-        if self.map_layers:
-            self.visible_layers = QgsProject.instance().layerTreeRoot()
-            self.allow_list = [lyr.id() for lyr in self.map_layers if lyr.type() == QgsMapLayerType.VectorLayer]# and self.visible_layers.findLayer(lyr).isVisible()]
-            #layers available: vector and currently visible on canvas. Then filter the combobox to exclude other layers
-            self.except_list = [l for l in self.map_layers if l.id() not in self.allow_list]
-            self.dlg.layer_to_Elist.setExceptedLayerList(self.except_list)
-            self.dlg.layer_to_Elist.setAllowEmptyLayer(True)
-            self.dlg.layer_to_Elist.setCurrentIndex(0)
-            self.dlg.export_Elist_to_csv.setEnabled(False)
-        else:
-            self.dlg.msg2.setText(self.tr_no_qgis_project)
-        
-    def show_existing_lists(self): # fetch existing Entity List names
-        self.reset_msg
-        self.dlg.existing_lists.clear()
-        self.dlg.dataset_2.clear()
-        self.existing_lists = []
-        self.dlg.dataset_2.addItem(str(self.tr_dataset))
-        self.selected_projectID_entity = str(self.dlg.projectID_entity.currentText()).split('|')[0]
-        global dataset_url
-        dataset_url = (str(odk_url),"/v1/projects/",str(self.selected_projectID_entity),"/datasets/")
-        dataset_url = "".join(dataset_url)
-        self.dlg.progressBar.setRange(0,0)
-        self.dlg.progressBar.setTextVisible(False)
-        dataset_response = requests.get(str(dataset_url), headers = {"Authorization": "Bearer " + session_token},)
-
-        if dataset_response.status_code == 200:
-            for ds in dataset_response.json():
-                self.dlg.dataset_2.addItem(str(ds["name"]))
-                self.existing_lists.append(ds["name"])
-            if len(self.existing_lists) >0:
-                ordered = sorted(self.existing_lists)
-                li = ("\n".join(ordered))
-                self.dlg.existing_lists.setText(li)
-                self.dlg.dataset_2.setEnabled(True)
-            else:
-                self.dlg.existing_lists.setText(self.tr_no_datasets)  
-
-        #advisory to see if a similar name exists and whether to create new list or update existing
-    def check_list_exists(self):
-        self.list_type = "create"
-        self.dlg.radio_new_code.setChecked(True)
-        #self.dlg.Elist_name.setStyleSheet("background: none")
-        try:
-            l = [item.lower() for item in self.existing_lists]
-            l_name = str(self.dlg.Elist_name.text()).lower()
-            if self.dlg.Elist_name.text() == self.dlg.dataset_2.currentText():
-                self.list_type="update"
-                self.dlg.radio_new_code.setChecked(False)
-                self.dlg.radio_update_code.setChecked(True)
-                return
-            elif self.existing_lists and l_name in l:
-                self.dlg.msg2.setText(str(self.dlg.msg2.text()) + self.tr_similar_list_exists)
-                self.dlg.msg2.setStyleSheet("color: #ffffff; background: red")
-                self.list_type="duplicate"
-                #print(l_name, l)
-            else:
-                self.reset_msg()
-                
-        except:    
-            self.dlg.msg2.setText(self.tr_not_connected)    
-
-    def entity_list_properties(self):
-        
-        if self.dlg.dataset_2.currentIndex() > 0:
-        
-            dataset_properties_url = (str(dataset_url),str(self.dlg.dataset_2.currentText()),".svc/Entities?$top=1")
-            dataset_properties_url = "".join(dataset_properties_url)
-            self.dlg.progressBar.setRange(0,0)
-            self.dlg.progressBar.setTextVisible(False)
-            
-            dataset_properties_response = requests.get(str(dataset_properties_url), headers = {"Authorization": "Bearer " + session_token},)
-            #print(dataset_properties_url, dataset_properties_response.status_code)
-            if dataset_properties_response.status_code == 200:
-                dsjson=dataset_properties_response.json()['value']
-                e_prop_list = pd.json_normalize(dsjson)
-                self.e_prop = list(e_prop_list)
-                self.dlg.existing_lists.clear()
-                self.existing_list_props = []
-                for field in self.e_prop:
-                    if "__" not in field:  
-                        self.existing_list_props.append(field)
-                if len(self.existing_list_props) >0:
-                    li = ("\n".join(self.existing_list_props))
-                    self.dlg.existing_lists.setText(li)
-                    self.dlg.existing_lists.setStyleSheet("background: DarkSeaGreen")
-                    self.dlg.e_prop_label.show()
-                    self.reset_msg()
-                else:
-                    self.dlg.msg2.setText(self.tr_empty_list)
-                #print(dsjson, entity_prop_list)
-                #print(self.e_prop)
-                self.dlg.Elist_name.setText(self.dlg.dataset_2.currentText())
-                self.check_list_exists()
-
-
-            else:
-                self.dlg.existing_lists.setText(self.tr_no_datasets)
-
-    def entity_match_central(self):
-        #check that the properties from the QGIS layer match those of the Central entity (if selected)
-        #iterate QGIS layer columns and check they are the same as Central, and in the same order.
-        #potentially reorder the columns from QGIS layer to match Central
-        if self.dlg.Elist_name.text() == self.dlg.dataset_2.currentText() and self.dlg.Elist_name.text()!='':
-            for i in range(self.dlg.Elist_properties.count()):
-                x = self.dlg.Elist_properties.itemText(i)
-                if x in self.e_prop:
-                    self.dlg.Elist_properties.setItemCheckState(i,2) 
-            self.useEntity = True
-            #for field in self.dlg.Elist_properties.currentData():
-                #if field is in self.existing_list_props()
-                #self.dlg.Elist_properties.setChecked(field)
-               # print(field)
-            # matched = 0
-            # for prop in self.e_prop:
-                # #if prop == 'label' or prop == 'geometry': #catch additional properties
-                # #    matched += 1
-                # if prop in self.dlg.Elist_properties.checkedItems():
-                    # matched += 1   
-            # #print(matched)
-            # if matched == len(self.dlg.Elist_properties.checkedItems()): #same fields selected as in Entity
-                # self.useEntity = True
-            # else:
-                # self.useEntity = False
-                # self.dlg.msg2.setText(self.tr_not_all_properties_selected)
-                # self.dlg.existing_lists.setStyleSheet("background: orange")
-        else:
-            self.useEntity = False
-
-    def layer_to_entity_list(self): #on select layer combo box
-        self.show_list_props
-        self.reset_msg()
-        if self.dlg.layer_to_Elist.currentIndex()>0:
-            self.df_export_entities = pd.DataFrame()
-            self.dlg.pyODK_code.resize(0,0)
-            self.dlg.Entity_table.resize(801,215)
-            self.dlg.Entity_table.clear()
-            self.dlg.Entity_table.setRowCount(0)
-            self.dlg.Entity_table.setColumnCount(0)
-            #self.dlg.Elist_label.clear()
-            self.dlg.Elist_label.setStyleSheet("background: none")
-            self.dlg.QGIS_KEY.setStyleSheet("background: none")
-            #self.dlg.QGIS_KEY.clear()
-            self.dlg.precheck_csv.setEnabled(False)
-            self.dlg.export_Elist_to_csv.setEnabled(False)
-            #self.dlg.load_entity_list_to_canvas.setEnabled(False)
-            self.Elist_layer = self.dlg.layer_to_Elist.currentLayer()
-            #check the layer and attributes
-            featureCount = self.Elist_layer.featureCount()
-            if featureCount > 50000:
-                message = self.tr_too_many_entities + str(featureCount)
-            else:
-                message = self.tr_this_many_entities + str(featureCount)
-            geomtype = QgsWkbTypes.displayString(self.Elist_layer.wkbType())
-            #print(geomtype)
-            if geomtype == "Unknown":
-                self.dlg.msg2.setText(self.tr_unknown_geometry)
-                self.dlg.Elist_label.clear()
-                self.dlg.QGIS_KEY.clear()
-                return
-            if QgsWkbTypes.isMultiType(self.Elist_layer.wkbType()) == True:
-                self.dlg.msg2.setText(self.tr_multipart)
-                self.dlg.Elist_label.clear()
-                self.dlg.QGIS_KEY.clear()                
-                return
-            message += ' ('+geomtype + ')'
-            if geomtype == "NOGEOMETRY":
-                message += '. ' + self.tr_no_geom_layer
-            
-            self.dlg.msg2.setText(message)
-           #populate fields for label and uuid - include blank
-
-            self.dlg.Elist_label.setLayer(self.Elist_layer)
-            self.dlg.Elist_label.setAllowEmptyFieldName(True)
-            field_list = self.Elist_layer.fields().names()
-            #has_label = "label"
-            if "label" in field_list:
-                self.dlg.Elist_label.setCurrentText("label")
-            else:
-                self.dlg.Elist_label.setCurrentIndex(0)
-            
-            self.dlg.QGIS_KEY.setLayer(self.Elist_layer)
-            self.dlg.QGIS_KEY.setAllowEmptyFieldName(True)
-            
-
-            
-            if "ENTITY_KEY" in field_list:
-                self.dlg.QGIS_KEY.setCurrentText("ENTITY_KEY")
-            else:
-                self.dlg.QGIS_KEY.setCurrentIndex(0)
-                
-            self.update_properties_list()
-            self.update_properties_list()
-#        else:
-#            self.dlg.msg2.setText(self.tr_no_qgis_project)
-
-    def label_unique(self):
-        if self.dlg.Elist_label.currentIndex()>0:
-            self.reset_msg()
-            if self.dlg.selected_features.isChecked():
-                get_features = QgsVectorLayerUtils.getValues(self.Elist_layer,self.dlg.Elist_label.currentText(),selectedOnly = True)
-            else:
-                get_features = QgsVectorLayerUtils.getValues(self.Elist_layer,self.dlg.Elist_label.currentText())
-            check_key = get_features[0] # return a list of values in the given field
-            unique = set(get_features[0])   #return a set (unique)             
-            nonull = list(filter(None, check_key)) #removes null values
-            #print(unique, check_key, nonull)
-            #print(len(unique), len(check_key), len(nonull))
-            if len(check_key) != len(nonull):
-                self.dlg.msg2.setText(self.tr_label_includes_null)
-                self.dlg.msg2.setStyleSheet("color: #ffffff; background: red")
-                self.dlg.Elist_label.setStyleSheet("background: red") 
-                self.dlg.precheck_csv.setEnabled(False)    
-            elif len(unique) != len(check_key):
-                self.dlg.msg2.setText(self.tr_label_not_unique)
-                self.dlg.msg2.setStyleSheet("background: orange")
-                self.dlg.Elist_label.setStyleSheet("background: orange") 
-                self.dlg.precheck_csv.setEnabled(True)
-            
-            else:    
-                self.dlg.Elist_label.setStyleSheet("background: DarkSeaGreen")
-                self.dlg.precheck_csv.setEnabled(True)
-        else:
-            self.dlg.precheck_csv.setEnabled(False)
-            self.dlg.Elist_label.setStyleSheet("background: red")
-                 
-    def check_is_UUID (self):
-        self.reset_msg()
-        if self.dlg.QGIS_KEY.currentText():
-            try:
-                get_feature = self.Elist_layer.getFeature(1)
-                val = get_feature[self.dlg.QGIS_KEY.currentText()]
-                #print (val)
-                #print (str(uuid.UUID(str(val))))
-                if str(uuid.UUID(str(val))):
-                    if self.dlg.selected_features.isChecked():
-                        get_features = QgsVectorLayerUtils.getValues(self.Elist_layer,self.dlg.QGIS_KEY.currentText(),selectedOnly = True)
-                    else:
-                        get_features = QgsVectorLayerUtils.getValues(self.Elist_layer,self.dlg.QGIS_KEY.currentText())
-                    check_key = get_features[0] # return a list of values in the given field
-                    unique = set(get_features[0])   #return a set (unique)
-                    #print(unique, check_key)
-                    #print(len(unique), len(check_key))                    
-                    if len(unique) != len(check_key):
-                        raise ValueError('null values')
-                    else:
-                        self.reset_msg()
-                        self.dlg.QGIS_KEY.setStyleSheet("background: DarkSeaGreen")
-                        self.dlg.precheck_csv.setEnabled(True)
-                        self.update_properties_list()
-            except ValueError:
-                self.dlg.msg2.setText(self.tr_invalid_uuid)
-                self.dlg.QGIS_KEY.setStyleSheet("background: red")
-                self.dlg.precheck_csv.setEnabled(False)
-        else:
-            self.dlg.QGIS_KEY.setStyleSheet("background: none")
-
-    #filter out un-selected items in layer - useful if part of large dataset or updating only part of the Entity List
-    def use_selected(self):
-        if self.dlg.layer_to_Elist.currentIndex()>0:
-            if self.dlg.selected_features.isChecked(): 
-                self.selected_featureids = self.Elist_layer.selectedFeatureIds() 
-                #print (self.selected_featureids)
-                if len(self.selected_featureids) == 0:
-                    self.dlg.msg2.setText(self.tr_none_selected)
-                    return
-                self.dlg.msg2.setText(self.tr_selected_in_layer + str(len(self.selected_featureids)))
-            else:
-                featureCount = self.Elist_layer.featureCount()
-                self.dlg.msg2.setText(self.tr_this_many_entities + str(featureCount))
-            if len(self.df_export_entities.index) > 0:
-                self.precheck_csv()
-
-    def show_list_props(self):
-        if self.existing_lists:
-            if self.dlg.Elist_name.text() == self.dlg.dataset_2.currentText():
-                self.dlg.existing_lists.setStyleSheet("background: DarkSeaGreen")
-                self.dlg.e_prop_label.show()
-            else:
-                self.dlg.existing_lists.setStyleSheet("background: none")
-                if len(self.existing_lists) >0:
-                    ordered = sorted(self.existing_lists)
-                    li = ("\n".join(ordered))
-                    self.dlg.existing_lists.setText(li)
-                    self.dlg.e_prop_label.hide()
-        return
-
-    # Multi-select combo for the fields to include within the entity list        
-    def update_properties_list(self):
-        self.reset_msg()
-        self.show_list_props()
-        transfer = ""
-        if self.dlg.Elist_label.currentIndex() == self.dlg.QGIS_KEY.currentIndex() and self.dlg.Elist_label.currentIndex() > 0:
-            self.dlg.msg2.setText(self.tr_same_fields)
-            return
-        if len(self.dlg.Elist_properties.checkedItems())>0 and self.dlg.Elist_name.text() != self.dlg.dataset_2.currentText():
-            transfer = self.dlg.Elist_properties.checkedItems() # remember already checked items if changing other values
-        self.dlg.Elist_properties.clear()
-        field_list = self.Elist_layer.fields().names()
-        if self.dlg.Elist_label.currentIndex() > 0:
-            self.label_unique()
-            field_list.remove(str(self.dlg.Elist_label.currentText()))
-            if str(self.dlg.Elist_label.currentText()) in transfer:
-                transfer.remove(str(self.dlg.Elist_label.currentText()))
-        if self.dlg.QGIS_KEY.currentIndex() >0:   
-            field_list.remove(str(self.dlg.QGIS_KEY.currentText()))
-            if str(self.dlg.QGIS_KEY.currentText()) in transfer:
-                transfer.remove(str(self.dlg.QGIS_KEY.currentText()))
-        #print(field_list, "label: ",self.dlg.Elist_label.currentText(),"; UUID: ",self.dlg.QGIS_KEY.currentText())
-        try:
-            field_list.remove("geom_from_ODK")
-            field_list.remove("entity_geom")
-        except:
-            pass
-        for field in field_list:
-            if "__" not in field:         #exclude ODK Central system values if they exist (e.g. from imported entities)
-                self.dlg.Elist_properties.addItem(field)
-
-        self.entity_match_central()
-        try: # soft error if one of the selected items is now name or label
-            if transfer:
-                self.dlg.Elist_properties.setCheckedItems(transfer)
-        except:
-            pass
-
-    def precheck_csv (self):
-        
-        if self.dlg.Elist_name.text():
-            self.reset_msg()
-            eid = ""
-            if self.dlg.Elist_label.currentIndex() > 0:
-                self.entity_match_central()
-                if self.dlg.Elist_properties.currentText(): #check that at least one additional property has been selected
-                    label = str(self.dlg.Elist_label.currentText())
-                    if self.dlg.QGIS_KEY.currentIndex()>0:
-                        eid = str(self.dlg.QGIS_KEY.currentText())
-                    
-                    geomtype = QgsWkbTypes.displayString(self.Elist_layer.wkbType())
-                    coordDimensions = QgsWkbTypes.coordDimensions(self.Elist_layer.wkbType()) # check whether XY, XYZ or XYZM
-                    if geomtype == "Unknown":
-                        self.dlg.msg2.setText(self.tr_unknown_geometry)
-                        return
-                    if QgsWkbTypes.isMultiType(self.Elist_layer.wkbType()) == True: # disallow multipart geometry layers (don't work in ODK Collect)
-                        self.dlg.msg2.setText(self.tr_multipart)
-                        self.dlg.Elist_label.clear()
-                        self.dlg.QGIS_KEY.clear()
-                        return
-                    cols = [f.name() for f in self.Elist_layer.fields()] + ['geometry'] + ['__id'] + ['base_version'] # get columns in layer and add geometry column for use with Entity list 
-                    row_list = []
-                    nogeom_row = 0
-
-                    if self.dlg.selected_features.isChecked():
-                        get_layer_features = self.Elist_layer.selectedFeatures()
-                    else:
-                        get_layer_features = self.Elist_layer.getFeatures()
-                    
-                    for f in get_layer_features:
-                        #convert QGIS geometry to ODK format (Lat Long Alt Accuracy) - includes checks for multi-part geometry
-                        geometry = ""
-                        geom = f.geometry()
-                        #transform from layer CRS to WGS84
-                        destCrs = QgsCoordinateReferenceSystem("EPSG:4326")
-                        sourceCrs = QgsCoordinateReferenceSystem(self.Elist_layer.crs())
-                        if self.Elist_layer.crs() != "EPSG:4326":
-                            tr = QgsCoordinateTransform(sourceCrs, destCrs, QgsProject.instance())                       
-                        if geom:
-                            geom.transform(tr)
-                            coords = geom.constGet().vertices()
-                            for vertex in coords:
-                                if coordDimensions == 2: #XY - 2D
-                                    zm = ' 0 0'
-                                if coordDimensions == 3: #XYZ - 3D
-                                    zm = ' ' + str(vertex.z()) + ' 0'
-                                if coordDimensions == 4: #XYZM - 4D
-                                    zm = ' ' + str(vertex.z()) + ' ' + str(vertex.m())
-                                if geometry =="":
-                                    geometry = str(vertex.y())+' ' + str(vertex.x()) + zm #Include Z and M (e.g. recorded accuracy) values if they exist
-                                else:
-                                    geometry += '; ' + str(vertex.y())+' ' + str(vertex.x()) + zm  
-
-                        else:
-                            nogeom_row += 1
-                        if eid:
-                            #print(f[eid], uuid.UUID(f[eid]))
-                            ENTITY_KEY = uuid.UUID(f[eid])
-
-                        else:
-                            ENTITY_KEY =uuid.uuid4()
-                        #print('ENTITY_KEY = ',ENTITY_KEY)
-                        try: # prevent error if there is no __system.version field (e.g. not an existing Entity List)
-                            if f['__system.version']:
-                                ENTITY_VERSION = f['__system.version']
-                        except:
-                            ENTITY_VERSION = 0
-                        #print(f.fields(),'Version found: ',ENTITY_VERSION)
-                        row_list.append(dict(zip(cols, (f.attributes() + [geometry] + [ENTITY_KEY] + [ENTITY_VERSION]))))
-                    self.df_create_entityList = pd.DataFrame(row_list, columns=cols)
-                    if nogeom_row:
-                        self.dlg.msg2.setText(str(nogeom_row) + ' / ' +str(len(row_list)) + self.tr_nogeom_row)
-                    
-                    #selected column list: 'label','eid', 'geometry' and base_version plus list of selected columns (also becomes the column order)
-                    #print (self.useEntity, self.existing_list_props, self.dlg.Elist_properties.checkedItems())
-                    if self.useEntity is True:
-                        self.existing_list_props.remove('label')
-                        self.existing_list_props.remove('geometry')
-                        selected_columns = ['__id'] + [label]  + ['geometry'] + self.existing_list_props + ['base_version']
-                    else:
-                        selected_columns = ['__id'] + [label]  + ['geometry'] + self.dlg.Elist_properties.checkedItems() + ['base_version']
-                    
-                    exclude_columns = list(set(cols).difference(selected_columns))
-                    df_excluded = self.df_create_entityList.drop(columns = exclude_columns) # remove columns that are not checked
-                    #print (selected_columns, exclude_columns, df_excluded.columns)
-                    df = df_excluded[selected_columns] # reorder the columns ready for export
-
-                    df.rename(columns = {label: 'label'}, inplace="True")
-                    self.entity_properties = list(df) # get list of included columns for pyODK script
-                    deduplicate = ["label", "__id", "base_version"]
-                    for dd in deduplicate:
-                        #print(self.entity_properties, dd)
-                        self.entity_properties.remove(dd) #exclude these fields from the list properties in pyODK script
-                    if self.dlg.onlycsv.isChecked():
-                        df.rename(columns = {'__id': 'name'}, inplace="True")
-                        self.onlycsv = True
-                    else:
-                        self.onlycsv = False
-                    #check if there actually is a base_version and drop column if necessary (i.e. if all values = 0)
-                    if len(df['base_version'].drop_duplicates()) == 1 and df.loc[0,'base_version'] == 0:
-                        #print('dropping: ',len(df['base_version'].drop_duplicates()) , df.loc[0,'base_version'])
-                        df = df.drop('base_version', axis = 1)
-                    #df.replace('NULL', '',inplace=True)
-                    #replace reserved column names - OData changes - to _ when importing submissions or entities, which could break the export... The reserved names for geodata are automatically changed back if found.
-                    headers = list(df)
-                    for header in headers:
-                        self.countUnderScores = 0
-                        if header in self.underScoreColumns:
-                            newHeader = header.replace('_','-')
-                            df.rename( columns ={header: newHeader},inplace="True")
-                            self.countUnderScores += 1
-                            
-                    self.updateEntityTable(df) # show the data in the table
-                    self.df_export_entities = df
-                    self.dlg.export_Elist_to_csv.setEnabled(True)
-                    #print(self.entity_properties)
-                    self.check_list_exists()
-                    self.Check_ColumnName(self.df_export_entities)
-                    if self.underScoreMessage:
-                        self.dlg.msg2.setText(self.underScoreMessage)
-                else:
-                    self.dlg.msg2.setText(self.tr_no_entity_properties)
-            else:
-                self.dlg.msg2.setText(self.tr_label_not_unique)
-
-                self.dlg.Elist_label.setStyleSheet("background: red")
-        else:
-            self.dlg.msg2.setText(self.tr_entity_name_required)
-            self.dlg.Elist_name.setStyleSheet("background: red")
-        
-    def entity_to_CSV (self):
-            self.entityCsvFilename, fileType = QFileDialog.getSaveFileName(None,'Select filename for ' + str(self.dlg.Elist_name.text()) + ' entity list',str(self.dlg.Elist_name.text()),"*.csv") 
-            if self.entityCsvFilename:
-                if self.dlg.onlycsv.isChecked() and self.onlycsv is False:
-                    self.df_export_entities.rename(columns = {'eid': 'name'}, inplace="True")
-                    self.onlycsv = True
-                if self.onlycsv is False:
-                    self.dlg.radio_new_code.show()
-                    self.dlg.radio_append_code.show()
-                    self.dlg.radio_update_code.show()
-                    self.dlg.radio_delete_code.show()
-                    self.dlg.label_radio_group.show()                    
-                    #self.dlg.radio_merge_code.show()  
-                    self.pyodk_calls()
-                    self.dlg.pyODK_code.setPlainText(self.pyodk_recipe)
-                self.reset_msg
-                try:
-                    self.df_export_entities.to_csv(str(self.entityCsvFilename), index=False)
-                    self.dlg.msg2.setText(self.tr_csv_exported + str(self.entityCsvFilename))
-
-                except:
-                    self.dlg.msg2.setText(self.tr_file_error)
-                    self.dlg.msg2.setStyleSheet("background: red")
-            else:
-                self.dlg.msg2.setText(self.tr_select_filepath)
-                self.dlg.msg2.setStyleSheet("background: red") 
-
-#    def load_entity_list_to_canvas(self): [toooooo complicated!]
-#        df_layer = self.df_export_entities
-#        df_layer.assign(geom_from_ODK=None)# add the QGIS geometry column
-#        self.keyLevel = "ENTITY_KEY"
-#        geomType = "geometry"
-#        self.load_csv_to_canvas(df_layer,geomType,self.entityCsvFilename)
-                
-    def updateEntityTable(self, df_table):
-        self.dlg.pyODK_code.resize(0,0)
-        self.dlg.Entity_table.resize(801,215)
-        self.dlg.Entity_table.clear()
-        if df_table.shape[0] == 0:
-            return
-        else:
-            headings = list(df_table)
-            
-            self.dlg.Entity_table.setRowCount(df_table.shape[0])
-            self.dlg.Entity_table.setColumnCount(df_table.shape[1])
-            self.dlg.Entity_table.setHorizontalHeaderLabels(headings)        
-            self.dlg.Entity_table.resizeColumnsToContents()
-            # convert dataframe to array before populating table
-            df_array = df_table.values
-            for row in range(df_table.shape[0]):
-                for col in range(df_table.shape[1]):
-                    self.dlg.Entity_table.setItem(row, col, QTableWidgetItem(str(df_array[row,col])))
-
-    def Check_ColumnName (self,df_table): # currently OData substitutes dash (-) for underscore (_) this is a check to warn the user
-        headings = list(df_table)
-        underScored = []
-        for heading in headings:
-            if '_' in heading and '__' not in heading and 'base_version' not in heading:
-                underScored += heading +' '
-        if underScored:
-            underScoredList = "".join(underScored)
-            self.underScoreMessage = self.tr_mind_the_underscore + str(underScoredList) + self.tr_mind_the_underscore2
-        else:
-            self.underScoreMessage = ''
-        return
-
-    # generate a recipe to copy into pyODK (create, merge, update or delete)
-    def pyodk_calls(self):
-        if not self.entityCsvFilename:
-            self.dlg.msg2.setText(self.tr_select_csv)
-        if self.dlg.export_Elist_to_csv.isEnabled() == True:
-            self.dlg.Entity_table.resize(0,0)
-            self.dlg.pyODK_code.resize(801,215)
-            entity_props = ",".join(self.entity_properties)
-            entity_props= entity_props.replace(',','", "')
-            if not self.selected_projectID_entity:
-                self.selected_projectID_entity = '0 # Please manually change to the relevant Project ID integer'
-
-
-            # V1.3: create script for pyODK (e.g. Jupyter Lab)
-            self.pyodk_recipe = '# This pyODK script was exported from QuODK to '+self.list_type + ' entities\n\n# NOTE: [Boring warning alert!] You remain responsible for checking:\n#    a) that the code is correct\n#    b) you understand the complexities of managing entities - it is not possible to anticipate every scenario or workflow with QuODK recipes - the more complex your situation the more difficult it is to cope with your requirements using these methods (offline entities, multiple forms updating the entities etc)\n#    c) that you are prepared if things go wrong (have you made a back up / snapshot of your Central installation on the server before starting?) \n\n'
-            #deal with the potential underscore substitution
-            if self.underScoreMessage:
-                self.pyodk_recipe +='#### CAUTION: '+self.underScoreMessage + '\n Please check if any entity_properties need to be updated from the list below and you may need to edit the csv file to change the column headings.\n'
-            self.pyodk_recipe +='from pyodk.client import Client\nfrom csv import DictReader\nfrom pathlib import Path\n#Variables from QuODK\nprojectId = ' + str(self.selected_projectID_entity) + '\nlistname="' + self.dlg.Elist_name.text() + '"\ncsv_path = "' + self.entityCsvFilename + '"\nentity_label_field = "label"\nentity_properties = ("' + entity_props +'")\neid = "__id" # This is the uuid field for the entity\n'
-
-            # if self.list_type == "merge":
-                # self.pyodk_recipe += 'entity_match_fields = () # Optionally select one or more of the properties above to allow merging of specific attributes'
-
-            self.pyodk_recipe += '\n\nwith Client(project_id=projectId) as client, open(csv_path) as csv_file:\n'
-
-            if self.list_type == "update":
-                if self.dlg.Elist_name.text() == self.dlg.dataset_2.currentText():
-                    e_props = ' '.join(self.e_prop)
-                    self.pyodk_recipe += '# The entity list on Central has the following properties: ' + e_props + ' (check they are the same as the list you have saved)\n'
-                else:
-                    self.pyodk_recipe += '# Caution: you have not selected an existing list - please check that the properties match those in your csv\n'
-                self.pyodk_recipe += 'version = "base_version"\n#(adapted from https://forum.getodk.org/t/updating-entities-with-csv-upload/48986)\n    for row in DictReader(csv_file):\n        client.entities.update(\n                row[eid],\n                entity_list_name = listname,\n                label = row[entity_label_field],\n                data={k: str(v) for k, v in row.items() if k in entity_properties},\n                base_version=int(row[version])\n                #force = True #uncomment this if you want to update regardless of potential conflicts - toggle with base_version\n                )\n        print (\'Updating entity id \',row[eid])\n    print (\'Complete\')'  
-                # adapted the 'data' statement from the Forum post to allow base_version to vary within the list without it being uploaded as a property.
-                return self.pyodk_recipe
-            if self.list_type == "delete":
-
-                self.pyodk_recipe += '    for row in DictReader(csv_file):\n        client.entities.delete(\n                uuid = row[eid],\n                entity_list_name = listname,\n                )\n\n         print (\'Deleting entity id \',row[eid])\n    print (\'Complete\') '           
-                if self.dlg.QGIS_KEY.currentIndex() == 0:
-                    self.dlg.msg2.setText(self.tr_no_uuid)
-                    self.pyodk_recipe += '#CAUTION: the Entity ids in the CSV file do not match the Central server - this script will not find any Entities to delete'
-                return self.pyodk_recipe
-            if self.list_type=="duplicate": #where the chosen list name is too similar (upper or lower case)
-                self.pyodk_recipe +='        #CAUTION: You have chosen an Entity List name that duplicates (or is upper/lower case equivalent) to an existing List within this project with id ' + str(self.selected_projectID_entity) + '. This script may not work! The rest of this script assumes creating a new list but you may need to change the projectId or listname.'
-                self.list_type = "create" #change the type to 'create' so that the rest of the recipe is available even though it might fail!
-            if self.list_type == "create":
-                #this version is used instead of [merge] so that Entity id can be defined from QGIS - workflow is 1: create list; 2: create properties; 3: create entities in loop
-                self.pyodk_recipe +='        # Create a new entity list first. If you are appending to an existing list choose the append script\n    entity_list = client.entity_lists.create(entity_list_name=listname)\n    for prop in entity_properties:\n        client.entity_lists.add_property(name=prop, entity_list_name=listname)\n\n         print (\'Creating entity property: \',prop)\n'
-            if self.list_type == "append":
-                self.pyodk_recipe +='#NOTE: when appending, make sure that the properties match those in Central to avoid failure.\n\n'
-            if  self.list_type == "create" or self.list_type == "append":
-                self.pyodk_recipe +='    for row in DictReader(csv_file):\n        client.entities.create(\n            label=row[entity_label_field],\n            uuid = row[eid], #remove or comment out this line to allow ODK Central to create the uuid (useful if you have already tested the csv and created entities with these uuids!)\n            data={k: str(v) for k, v in row.items() if k in entity_properties},\n            entity_list_name=listname,\n            )\n\n         print (\'Uploading entity id: \',row[eid])\n    print (\'Complete\') ' 
-                
-            #MERGE not included in current recipe choices - uncertain about some functions!
-            # if self.list_type == "merge":
-                # self.pyodk_recipe +='        # Use MERGE (with care!) to update existing entity list - this is a powerful but complex area with potential for conflicts if Entities could be updated via ODK Collect. Check your work flow!! If in doubt, you might want to use UPDATE instead as it also checks against the base_version on Central\n'
-                # self.pyodk_recipe +='    client.entities.merge(\n                        data=DictReader(csv_file),\n                        entity_list_name=listname,\n                        source_label_key = entity_label_field,\n                        #match_keys= entity_match_fields, #uncomment if you have another KEY in your dataset to identify the Entity\n'
-
-                # # if self.dlg.QGIS_KEY.currentIndex()>0:
-                    # # self.pyodk_recipe +='                        match_keys= entity_match_fields,\n'
-                # # else:
-                    # # self.pyodk_recipe +='                        match_keys= entity_label_field,\n'
-                # self.pyodk_recipe +='                        add_new_properties=True, #[for new entity lists or] if you have additional properties to those already in the list - otherwise set to False\n'
-            # #if self.list_type =="merge":
-                # self.pyodk_recipe +='                        update_matched=True,\n                        delete_not_matched=False, #switch to True to purge other entities in this list - use with caution!\n'
-
-        else:
-            self.pyodk_recipe = ""
-        return self.pyodk_recipe
-
-    #Radio buttons to change the code displayed for Entity updates
-            
-    def pyodk_buttons(self):
-        if self.pyodk_radio.checkedId() == 1:
-            self.list_type = "create"
-        elif self.pyodk_radio.checkedId() == 2:
-            self.list_type = "append"
-        elif self.pyodk_radio.checkedId() == 3:
-            self.list_type = "update"
-        elif self.pyodk_radio.checkedId() == 4:
-            self.list_type = "delete"
-        elif self.pyodk_radio.checkedId() == 5:
-            self.list_type = "merge"
-        self.pyodk_calls()
-        self.dlg.pyODK_code.setPlainText(self.pyodk_recipe)
-
-    def save_entity_config(self): # not implemented yet - may not have enough use cases?
-
-        config = ConfigParser()
-        save_config_section = str(self.dlg.layer_to_Elist.currentText())+'_'+str(self.dlg.Elist_name.text())+'_'+ str(self.list_type)
-        QGIS_project = str(QgsProject.instance().absoluteFilePath()).replace('.','_')
-        config_path = '/config_quodk.ini'
-        
-        config.read(QGIS_project+config_path)
-        
-        config.add_section(save_config_section)
-        config.set(save_config_section, 'projectId', str(self.dlg.projectID_entity.currentIndex()))
-        config.set(save_config_section, 'listname', str(self.dlg.Elist_name.text()))
-        config.set(save_config_section, 'layer', str(self.dlg.layer_to_Elist.currentIndex()))
-        config.set(save_config_section, 'label', str(self.dlg.Elist_label.currentIndex()))
-        config.set(save_config_section, 'uuid', str(self.dlg.QGIS_KEY.currentIndex()))
-        config.set(save_config_section, 'fields', str(self.entity_properties))
-        config.set(save_config_section, 'script', str(self.pyodk_radio.checkedId()))
-        config.set(save_config_section, 'CSV file', str(self.entityCsvFilename))
-        try:        
-            with open(QgsProject.instance().absolutePath()+config_path, 'w') as f:
-                config.write(f)
-            self.dlg.msg2.setText('Saved to: '+ QgsProject.instance().absolutePath()+config_path)
-            self.dlg.save_config.setStyleSheet("background: DarkSeaGreen")
-        except IOError:
-            self.dlg.msg2.setText( 'Unable to write to file ' + QgsProject.instance().absolutePath()+config_path )
-            self.dlg.save_config.setStyleSheet("background: red")
-        
-    def load_entity_config(self):
-        #load the config parameters
-        self.populateLayers()
-        self.layer_to_entity_list()
-        #set current index of label and uuid
-        self.update_properties_list()
-        #set properties list for checked fields
-        
+        if hasattr(self.dlg, 'load_to_canvas'):
+            self.dlg.load_to_canvas.setEnabled(False)
+
+        # Load images
+        if hasattr(self.dlg, 'WTT_label'):
+            wtt = QPixmap(os.path.join(os.path.dirname(__file__), 'WTT.png'))
+            self.dlg.WTT_label.setPixmap(wtt)
+        pix = QPixmap(os.path.join(os.path.dirname(__file__), 'quodk.png'))
+        auto_pix = QPixmap(os.path.join(os.path.dirname(__file__), 'quodk_auto.png'))
+        auto_button_pix = QPixmap(os.path.join(os.path.dirname(__file__), 'auto-pilot.png'))
+        if hasattr(self.dlg, 'QuODK_label'):
+            self.dlg.QuODK_label.setPixmap(pix)
+        if hasattr(self.dlg, 'QuODK_label_2'):
+            self.dlg.QuODK_label_2.setPixmap(auto_pix)
+        if hasattr(self.dlg, 'QuODK_label_go'):
+            self.dlg.QuODK_label_go.setPixmap(auto_pix)
+        if hasattr(self.dlg, 'run_auto_pilot'):
+            self.dlg.run_auto_pilot.setIcon(QIcon(auto_button_pix))
+
+        # Entity Management connections
+        if hasattr(self.dlg, 'dataset_existing'):
+            self.dlg.dataset_existing.activated.connect(self.interface.entity_list_properties)
+        if hasattr(self.dlg, 'layer_to_Elist'):
+            self.dlg.layer_to_Elist.activated.connect(self.interface.layer_to_entity_list)
+        if hasattr(self.dlg, 'Elist_properties'):
+            self.dlg.Elist_properties.view().setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        if hasattr(self.dlg, 'Elist_name'):
+            self.dlg.Elist_name.editingFinished.connect(self.interface.check_list_exists)
+            self.dlg.Elist_name.textEdited.connect(self.interface.reset_msg)
+        if hasattr(self.dlg, 'Elist_label'):
+            self.dlg.Elist_label.activated.connect(self.interface.update_properties_list)
+        if hasattr(self.dlg, 'QGIS_KEY'):
+            self.dlg.QGIS_KEY.activated.connect(self.interface.check_is_UUID)
+        if hasattr(self.dlg, 'precheck_csv'):
+            self.dlg.precheck_csv.clicked.connect(self.interface.precheck_csv)
+        if hasattr(self.dlg, 'export_Elist_to_csv'):
+            self.dlg.export_Elist_to_csv.clicked.connect(self.interface.entity_to_CSV)
+        if hasattr(self.dlg, 'selected_features'):
+            self.dlg.selected_features.toggled.connect(self.interface.use_selected)
+
+        # Setup pyODK radio button group
+        if hasattr(self.dlg, 'radio_new_code'):
+            self.dlg.pyODK_code.resize(0, 0)
+
+            self.interface.pyodk_radio = QButtonGroup()
+            self.interface.pyodk_radio.addButton(self.dlg.radio_new_code, 1)
+            if hasattr(self.dlg, 'radio_append_code'):
+                self.interface.pyodk_radio.addButton(self.dlg.radio_append_code, 2)
+            if hasattr(self.dlg, 'radio_update_code'):
+                self.interface.pyodk_radio.addButton(self.dlg.radio_update_code, 3)
+            if hasattr(self.dlg, 'radio_delete_code'):
+                self.interface.pyodk_radio.addButton(self.dlg.radio_delete_code, 4)
+            if hasattr(self.dlg, 'radio_merge_code'):
+                self.interface.pyodk_radio.addButton(self.dlg.radio_merge_code, 5)
+            self.interface.pyodk_radio.setExclusive(True)
+            self.interface.pyodk_radio.buttonClicked.connect(self.interface.pyodk_buttons)
+
+    def setup_ui_connections_auto_pilot(self):
+        """Setup UI connections for Auto-Pilot dialog"""
+
+        dlg = self.dlg_auto_pilot
+        interface = self.interface_auto_pilot
+
+        # Date controls - use 'auto' trigger for auto-pilot dialog
+        if hasattr(dlg, 'DateStart'):
+            dlg.DateStart.dateChanged.connect(interface.onAutoPilotDateChanged)
+        if hasattr(dlg, 'DateEnd'):
+            dlg.DateEnd.dateChanged.connect(interface.onAutoPilotDateChanged)
+        if hasattr(dlg, 'sinceLastDownload'):
+            dlg.sinceLastDownload.toggled.connect(interface.onAutoPilotDateChanged)
+        if hasattr(dlg, 'btnSelectConfig'):
+            dlg.btnSelectConfig.clicked.connect(interface.select_auto_pilot_file)
+        if hasattr(dlg, 'unlock_quodkey'):
+            dlg.quodkey_auto.setVisible(False)
+            dlg.unlock_quodkey.setVisible(False)
+            dlg.label_quodkey.setVisible(False)
+            dlg.unlock_quodkey.clicked.connect(interface.unlock_quodkey)
+        if hasattr(dlg, 'start_auto_pilot'):
+            dlg.start_auto_pilot.setEnabled(False)
+            dlg.start_auto_pilot.clicked.connect(interface.auto_pilot)
+        if hasattr(dlg, 'Attachments_auto'):
+            dlg.Attachments_auto.setEnabled(False)
+            dlg.Attachments_auto.clicked.connect(interface.download_images)
+        if hasattr(dlg, 'closeWindow'):
+            dlg.closeWindow.clicked.connect(dlg.reject)
+        if hasattr(dlg, 'attributeFilter'):
+            dlg.attributeFilter.activated.connect(interface.filter_items_auto)
+        if hasattr(dlg, 'valueFilter'):
+            dlg.valueFilter.activated.connect(interface.filter_value_auto)
+        if hasattr(dlg, 'clearFilter'):
+            dlg.clearFilter.clicked.connect(interface.clearFilter_auto)
+        if hasattr(dlg, 'filterExclude'):
+            dlg.filterExclude.clicked.connect(interface.changeFilterState_auto)
+
+        # Load logo image
+        auto_pix = QPixmap(os.path.join(os.path.dirname(__file__), 'quodk_auto.png'))
+        if hasattr(dlg, 'QuODK_label_go'):
+            dlg.QuODK_label_go.setPixmap(auto_pix)

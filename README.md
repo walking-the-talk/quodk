@@ -1,118 +1,50 @@
-![QuODK](/quodk.png)
+# Quick start
+This plugin works alongside an ODK Central Server (not Kobo / Ona etc). It allows you to load geo-located data gathered in ODK Collect forms as QGIS temporary layers, as well as download associated attachments. It is designed to allow you to incrementally download submissions (by selecting a date range of when data was sent from ODK Collect to the server. You can use an automated method or download each set of repeats manually
 
-This plugin for QGIS works alongside an ODK Central Server (**not Kobo / Ona etc**). It allows you to load geo-located data gathered in ODK Collect / Webforms or Enketo forms as QGIS temporary layers, as well as downloading associated attachments. It is designed to allow you to incrementally download submissions (by selecting a date range of when data was sent from ODK Collect to the server. You can, with caution, opt to load all records - bear in mind this could take some time for large datasets with lots of attachments.
+## Auto Pilot
+This is a simple form to allow you to download the records within a given form and associated Entity List (if relevant) as well as the attachments. You can choose a date range and filter the submissions (but all Entities created and update in that date range are included). The Auto Pilot works from an encrypted configuration file (username and password are kept encrypted with a Fernet key stored on the local machine) - this file provides QuODK with the Project, Form, Repeats and Entities, with the associated geometry type(s).
 
-![QuODK main screen](/Screenshot1.png)
+## Manual download
+You can select a form or Entity List and download submissions / entities within a given date range, and filter. Each repeat group is downloaded as a separate layer (or non-spatial table if there is no geometry field).
 
-# Contents
-**[Getting Started](#getting-started)**
+Once you connect to your server you will get a list of ODK projects, if appropriate to your permissions, and then you can select the form you would like to download. If your form has repeat groups with location data you can select the repeat as well as the main form. You can load any form or repeat as a simple table if there is no location data (in case you want to link data in QGIS).
 
-+[Prerequisites](#prerequisites)
-+[Set Up](set-up)
+You can select a different Projection for each layer to fit with your project / location (e.g. OSGB grid). You can also download data as CSV (which is loaded as a delimited text file in WGS84 projection in QGIS).
 
-**[Using QuODK](#using-quodk)**
+*NOTE*: By default QuODK only loads features with spatial data (point / line / polygon) so that they can be displayed in QGIS, but if you have some records that have no location data you can choose to include them and manual add relevant spatial data. [Once the layer is loaded, select the feature in the attribute table and then choose Add part in QGIS digitising toolbar] 
 
-+[Downloading submissions](#downloading-submissions)
-+[Media attachments](#media-attachments)
-+[Downloading Enitities](#downloading-entities)
-
-**[Entity Management](#entity-management)**
-
-**[Credits](#credits)**
-
-**[More about ODK](#find-out-more-about-odk)**
+### For Entities and forms that use 'geometry' field
+A special function is needed because ODK Collect and ODK Central are 'agnostic' to geometry type when plotting spatial data (an entity list could have a combination of any geometry type) - QGIS uses a separate layer for each geometry type so you could find multiple layers loaded (each is named with the type!). If you use a field called 'geometry' to combine different questions from Collect, QuODK will detect and separate the geometry types. [You might use this so that ODK Central can plot the geometry in it's map preview]
 
 
-# Getting Started
+### Attachments
+After you have selected the data (in Manual or Auto-pilot mode) you can download related attachments to a folder on your computer. QuODK creates a project variable called @ODK_image_path so that you can view the attachments in the attribute form by setting the default path to this variable. Be aware that the plugin might freeze for a while when it loads the attachments form if you have lots of submissions. If you choose to download all the attachments listed it can take a while, needing high bandwidth - use with caution.
 
-## Prerequisites / dependencies
+# Set up
 
-QuODK requires PANDAS package to be installed in order to function:
+Ask the person responsible for managing your ODK Central server to provide you with an Auto-pilot file (and the QuODKey to unlock it) for each form's submissions you need to download. 
 
- https://pandas.pydata.org/pandas-docs/stable/getting_started/install.html
+Alternatively, if you are dealing with multiple forms, you can get log-in details (hint: it may be useful to set up a separate web-user on Central with restricted access - e.g. Project Viewer). These details are stored in QGIS settings and you can choose to use the QGIS Authentication system for storing the username and password.
 
+# Advanced operations
 
+## Create and Share Auto-pilot
+You can create Auto Pilot files - either your own use or, with caveats, for sharing. Select the Form and geometry for each repeat, and whether to include Entities. You can create a filter to restrict the submissions available (e.g. __system.submitterName corresponds to the App user) or Entities (separate filter to account for the different structure).
+*Data Protection Note*: It is not currently possible to filter data via the API (i.e. at source), so the unfiltered values are retrieved and filtered by QuODK. Although the full data is not available to the QGIS user, it may be technically possible to intercept the full dataset, so this function needs to be used with awareness of potential data protection issues (e.g. sharing submissions that contain sensitive data).
 
-**WINDOWS**: open OSGEO4W command line to ensure it is installed in the correct version / location. You could use: 
->pip install pandas
+If you want to share the Auto Pilot file you need to generate a QuODKey so that the other user(s) can unlock the file (and it will be re-encrypted on their PC) - take care when sharing these elements, as it is not possible to prevent the password being exposed to a serious hacker if both the QuODKey and locked Auto-pilot file are stored in the same place or transmitted insecurely. However, once locally unlocked the QuODKey is redundant and the Auto-pilot file cannot be used on another PC.
 
-**LINUX / MACOS**: you may need to set up a virtual environment to install the pandas package - and avoid conflict. The following can be used in Linux:
->sudo apt install python3-pandas
+## Manage Entities
+You can create new Entity Lists from QGIS layers, update existing lists and combine geometry types. You can also delete one or more Entities. Select a QGIS layer with single-part geometry for this to work (ODK Collect does not handle Multi-part geometry). Select the field to be used for the entity label (does not need to be unique) and an entity id (you can create one in QGIS or leave blank and one will be added to the output).  You can also select which fields to include in the entity properties. QuODK will save the layer as a CSV for upload to ODK Central (new entity lists) or via the API (for all other operations). You can choose the type of Entity List operation and QuODK will adapt the script accordingly...
 
-## Set up
-
-Ask the person responsible for managing your ODK Central server to provide you with log-in details.
-
-**Hint**: it may be useful to set up a separate web-user on Central with restricted access - e.g. Project Viewer. You can choose whether or not to save the ODK Central password. **NOTE**: the set up data is stored in plain-text on your computer in ~~the QGIS plug-in folder~~ your HOME folder (as of v1.3.2) - this means that is won't be overwritten when upgrading to new versions in future.
-
-# Using QuODK
-Within this plugin there is an underlying assumption that you are vaguely familiar with ODK Collect / Webforms / Enketo and the outputs from ODK Central (QuODK works with the API and oData outputs) - please see the documentation if you are in doubt https://docs.getodk.org - please make sure you understand the concept of forms, repeat groups, submissions, media attachments and entities before setting sail with QuODK.
-
-The plugin is built around drop-down combo-boxes, check-boxes and push-buttons to reduce the amount of 'prior knowledge' required about the data. This necessarily means that all entities, forms and submissions available to the Central User will be listed when you connect to your Server. Discuss any data protection or privacy issues with your Data Manager (it's beyond scope of QuODK to manage privileges and data privacy!). Where possible there is a 'logic' to which options can be selected as you progress through the plugin... So, for example you can't activate the 'Load to canvas' if you haven't selected which geometry column to use - where your data only has one available option, QuODK will use this as the default value to reduce the frustration of clickerty-boo... Sometimes if you have done too much *Blakery* (ref: clicking every permutation of option and button) you may get unexpected behaviour - please report an issue and restart QuODK - then try working from top to bottom on the user interface!
-
-## Downloading submissions
-
-Once you connect to your server you will get a list of ODK projects that you are authorised to view and then you can select the form you would like to download submissions. If your form has repeat groups with location data you can select the repeat as well as the main form - each Repeat Group will be a separate layer in QGIS and QuODK retains the relationships between the main form and repeat using the KEY and PARENT_KEY fields. You can load any form or repeat as a simple table if there is no location data (in case you want to link data in QGIS).
-
-![screen-shot of Form selection](/Screenshot2.png)
-
-Use the date filters to restrict the scope of the download from the server (particularly useful if you have a slow connection or large dataset). You can optionally ignore dates - but be aware that this downloads ALL submissions for the given form or repeat. **NOTE** ODK Central stores submissions in UTC time (equivalent to GMT). QuODK has a simple internationalisation feature to account for your time zone if required - due to Python / Windows inconsistencies, the method used might fail around the time of clocks changing - please be aware of this if you are trying to download submissions on a daily basis around this time of year. In all other situations it would probably be cumbersome to include an hourly option for the date filter. 
-
-![screen-shot of date filters](/Screenshot3.png) 
-![screen-shot of all submissions](/Screenshot4.png)
-
-You can further filter your data according to one of the attributes within the form to include or exclude one value - e.g. if you have a question for Surveyor Name, you can filter on this to download a single surveyor's data.
-
-![screen-shot of attribute filters](/Screenshot4.png)
-
-By default, data is loaded as lat/long (EPSG:4326 Projection) but you can select a different Projection for the layer to fit with your location (e.g. OSGB grid). You can also download data as CSV. All geometry data are saved in XYZM format with the M variable denoting the accuracy of each point or vertex.
-
-![screen-shot of temporary layer](/Screenshot5.png)
-
-**NOTE**: By default, QuODK only includes features with spatial data (point / line / polygon) so that they can be displayed in QGIS, but if you have some records that are missing or have no location data you can choose to include them (check box) and manually add relevant spatial data. 
-
-*HINT: for features that have no geometry, once the layer is loaded, select the feature in the attribute table and then choose "Add part" in QGIS digitising toolbar - you can then digitise the geometry and save the record* 
-
-## Media Attachments
-After you have selected the data you can download related media attachments to a folder on your computer. This plugin also creates a project variable called **@ODK_image_path** so that you can view image attachments in the attribute form by setting the default path to this variable. Be aware that the plugin might freeze for a while when it downloads the attachments if you have chosen lots of submissions - and also that it could take considerable bandwidth / consume data.  
-
-**Note**: if you use the same QGIS project to download attachments from multiple forms to different folders on your computer you may need to manually adapt the project variables to include different locations.
-
-## Downloading Entities
-If the selected project includes any Entity Lists you have the option to download New or Updated entities (within your date range or all).
-
-![screen-shot of entities](/Screenshot6.png)
-
-**Note**: ODK Entity Lists are 'agnostic' about geometry - this means that you can mix-and-match different geometry types in a single entity list providing you have a field called *geometry*. This presents a challenge when downloading an entity list as QGIS can only use one geometry type per layer. QuODK handles this by splitting out the geometry according to type (Point / Line / Polygon) and loading separate layers for each but with the same attribute structure.
-
-# Entity Management
-If you need to generate an Entity List from a QGIS layer, or edit existing Entities in QGIS (e.g. adjust the geometry or other attributes), QuODK can be used to prepare a CSV file that can be uploaded to ODK Central Server. This is a relatively complex concept and you are well advised to become familiar with Entities before using QuODK for this purpose - for example: https://docs.getodk.org/entities-quick-reference/
-
-![screen-shot of creating entity list](/Screenshot7.png)
-
-You can export QGIS layers (point, line or polygon, or even those without geometry) with any attributes within that layer. **NOTE**: make sure your geometry is 'single part' - each entity needs to have its own geometry and multipart geometries cannot be handled. 
-
-
-QuODK will generate a UUID field or you can choose an existing UUID (useful if you want to update existing entities or keep a clear link between QGIS data and Entity lists or if you are updating entities). This also means you could include additional fields that control the format of the entity on the map widgets (e.g. marker-colour, marker-style, stroke or stroke-width).
-
-If you are using existing Entity Lists, QuODK will try to match the fields in your QGIS layer with those in the Entity List selected - it doesn't always work, but in most 'working scenarios' it should be straightforward. For example if you download a set of entities from a List on Central, make changes to geometry or attributes, you can select the Entity List using the drop-down menu and match the exported ENTITY_New layer, then QuODK will pre-fill the rest and produce the script to update (and you can also select a sub-set of entities within the layer in QGIS).
-
-![screen-shot of entity list preview](/Screenshot10.png)
-
-However, upload of new entities or modification of existing entities requires additional privileges in Central and could potentially affect data collection / data integrity. For this reason (and because it is hard to anticipate every scenario for adapting entity lists), you cannot update Entities directly from QuODK. There is an intermediary step that needs to be done with pyODK (please see https://getodk.github.io/pyodk) - so you need to know how to drive pyODK!
-
-It appears that OData replaces the dash - character with the underscore _ character when exporting from Central. This potentially causes problems for entities if you are trying to update an existing Entity List. QuODK will change *known* fields such as *marker-color* (which is exported as *marker_color*) but if you have fields that include a dash, be prepared for trouble.
-
-![screen-shot of pyODK recipe](/Screenshot11.png)
-
- QuODK will also generate a pyODK script for you to copy and paste (e.g. into Jupyter Lab). You can select whether to create, append, update or delete entities using the script. The CSV file includes the **\__id** column to identify the UUID on ODK Central
-
+You will need to install pyODK to access the API - doing this directly with QuODK could lead to loss of data, so the QuODK simply provides you with a script to use with pyODK - the Central User needs the appropriate permissions.
 
 # Credits
 
-This plugin was inspired by FooODK which written in Swahili for WWF Tanzania by Cuthbert-Langen Mushi. Code refactoring, additional features and translations were implemented by Chris York at Walking-the-Talk. The plugin uses the ODK Central API to access the server and more functionality is planned ...
+This plugin was inspired by FooODK written in Swahili for WWF Tanzania by Cuthbert-Langen Mushi. Code refactoring, additional features and translations were implemented by Chris York at Walking-the-Talk. Version 2 employed AI to help with refactoring code and implementing the QGIS Authentication. The plugin uses the ODK Central API to access the server.
 
-# Find out more about ODK
+## Find out more about ODK
 
 ODK is an ecosystem of open source mobile data collection supported by a core development team and an active community.
 ODK website: https://getodk.org
+
