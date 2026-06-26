@@ -298,8 +298,6 @@ class QuODK:
             self.dlg.entityValueFilter.activated.connect(lambda: self.interface.filter_Value('entity_config'))
         if hasattr(self.dlg, 'entityFilter'):
             self.dlg.entityFilter.activated.connect(lambda: self.interface.filter_items('entity_config'))
-        if hasattr(self.dlg, 'entityFilter_2'):
-            self.dlg.entityFilter_2.activated.connect(lambda: self.interface.filter_items('config'))
         if hasattr(self.dlg, 'add_manual_filter'):
             self.dlg.add_manual_filter.clicked.connect(self.interface.add_filter_value)
         if hasattr(self.dlg, 'clearFilter'):

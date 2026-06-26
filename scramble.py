@@ -35,7 +35,6 @@ class manage_credentials:
         #NOTE: self.whisk is used to unlock the (shared) QuODKey generated in the UI to allow initial use of an auto-pilot config file -
         # it used only once for each auto-pilot file (if it is supplied locked) and a new (or existing) QuODKey is used for all subsequent operations
         #once unlocked the original (shared) QuODKey is useless and can be deleted
-        self.whisk = b'6dWSvWrrjwyGzCECetswdOUuRAFr7XrLmWVvIH4Qwjk='
         self.QuODKey = self.get_QuODKey()
 
     def get_QuODKey(self):
@@ -56,14 +55,18 @@ class manage_credentials:
             print(f"Error creating personal key: {e}")
             return None
 
-    def unscramble(self, odkpass, odkuser, trigger):
-        """Decrypt the file using appropriate key.
+    def unscramble(self, odkpass, odkuser, trigger, quodkey=None):
+        """Decrypt the file using the appropriate key.
         """
         feedback = None
         try:
             if trigger == 'config':
-                unscrambled = F(self.whisk).decrypt(odkpass.encode())
-                unscrambled_user = F(self.whisk).decrypt(odkuser.encode())
+                if quodkey:
+                    unscrambled = F(quodkey).decrypt(odkpass.encode())
+                    unscrambled_user = F(quodkey).decrypt(odkuser.encode())
+                else:
+                    feedback = 'No QuODKey found'
+                    return None, None, feedback
             else:
                 unscrambled = F(self.QuODKey).decrypt(odkpass.encode())
                 unscrambled_user = F(self.QuODKey).decrypt(odkuser.encode())
@@ -81,59 +84,101 @@ class manage_credentials:
                 feedback += '\n\nIt is possible that you are using an auto-pilot config file that was generated / unlocked on a different computer.'
                 return None, None, feedback
 
-    def scrambler(self, odkpass, odkuser, trigger):
+    def scrambler(self, odkpass, odkuser, trigger, quodkey=None):
         if trigger == 'config':
-            scrambled = F(self.whisk).encrypt(odkpass.encode())
-            scrambled_user = F(self.whisk).encrypt(odkuser.encode())
+            if not(quodkey):
+                return None, None, 'No QuODKey provided'
+            key = (quodkey.encode()) if isinstance(quodkey, str) else quodkey
+            scrambled = F(key).encrypt(odkpass.encode())
+            scrambled_user = F(key).encrypt(odkuser.encode())
         else:
             if not(self.QuODKey):
                 self.get_QuODKey()
             scrambled = F(self.QuODKey).encrypt(odkpass.encode())
             scrambled_user = F(self.QuODKey).encrypt(odkuser.encode())
-        return scrambled.decode(), scrambled_user.decode()
+        return scrambled.decode(), scrambled_user.decode(), 'Locked'
+
+    def scramble_filters(self, filters, trigger, quodkey=None):
+        """Encrypt filter values."""
+        if trigger == 'config':
+            if not quodkey:
+                return filters
+            key = (quodkey.encode()) if isinstance(quodkey, str) else quodkey
+        else:
+            if not self.QuODKey:
+                self.get_QuODKey()
+            key = self.QuODKey
+
+        if not key:
+            return filters
+
+        scrambled = {}
+        fernet = F(key)
+        for k, v in filters.items():
+            if v:
+                scrambled[k] = fernet.encrypt(str(v).encode()).decode()
+            else:
+                scrambled[k] = fernet.encrypt("__QuODK__".encode()).decode()
+        return scrambled
+
+    def unscramble_filters(self, filters, trigger, quodkey=None):
+        """Decrypt filter values."""
+        if trigger == 'config':
+            if not quodkey:
+                return filters
+            key = (quodkey.encode()) if isinstance(quodkey, str) else quodkey
+        else:
+            if not self.QuODKey:
+                self.get_QuODKey()
+            key = self.QuODKey
+
+        if not key:
+            return filters
+
+        unscrambled = {}
+        fernet = F(key)
+        for k, v in filters.items():
+            if v:
+                try:
+                    unscrambled[k] = fernet.decrypt(str(v).encode()).decode()
+                    if unscrambled[k] == "__QuODK__":
+                        unscrambled[k] = None
+                except Exception:
+                    unscrambled[k] = v
+            else:
+                unscrambled[k] = v
+        return unscrambled
 
     def generate_encryption_key(self, odkpass,odkuser):
         """
         Create quodkey encryption key and scramble user and pass for transit.
         """
-        locked_pass = None
-        locked_user = None
         quodkey = F.generate_key()
         key_return = quodkey.decode() if isinstance(quodkey, bytes) else quodkey
-        try:
-            locked_pass = F(self.whisk).encrypt(F(quodkey).encrypt(odkpass.encode())).decode()
-            locked_user = F(self.whisk).encrypt(F(quodkey).encrypt(odkuser.encode())).decode()
-
-        except Exception as e:
-            print(f"Error encrypting with combo-key: {e}")
-
-        if locked_pass and locked_user:
-            return key_return, locked_pass, locked_user
+        locked = self.scrambler(odkpass, odkuser, 'config', key_return)
+        if locked:
+            return key_return, locked[0], locked[1]
         else:
             return key_return, None, None
         # Display in the QuODKey_generated text field
 
 
-    def unlock_permissions(self,odkpass, odkuser, quodkey):
+    def unlock_permissions(self,odkpass, odkuser, quodkey, filters=None):
         feedback = None
         try:
-            bytepass = odkpass.encode() if isinstance(odkpass, str) else odkpass
-            byteuser = odkuser.encode() if isinstance(odkuser, str) else odkuser
-            key = (quodkey.encode()) if isinstance(quodkey, str) else quodkey
-
-            unlocked = F(key).decrypt(F(self.whisk).decrypt(bytepass)).decode()
-            unlocked_user = F(key).decrypt(F(self.whisk).decrypt(byteuser)).decode()
+            intermediate = self.unscramble(odkpass, odkuser, 'config', quodkey)
+            unscrambled_filters = self.unscramble_filters(filters, 'config', quodkey) if filters else {}
+            feedback = f"{intermediate[2]}\n"
             #re-encrypt with QuODKey (create new key if required)
-            if unlocked and unlocked_user:
-                unlocked_scrambled = self.scrambler(unlocked,unlocked_user, 'auto')
+            if intermediate[2] == 'Unlocked':
+                unlocked_scrambled = self.scrambler(intermediate[0],intermediate[1], 'auto')
+                re_encrypted_filters = self.scramble_filters(unscrambled_filters, 'auto')
                 feedback = 'Unlocked'
-                return unlocked_scrambled[0], unlocked_scrambled[1], feedback
+                return unlocked_scrambled[0], unlocked_scrambled[1], feedback, re_encrypted_filters
             else:
                 feedback = 'No credentials found'
-                return None, None, feedback
-
-
+                return None, None, feedback, {}
         except Exception as e:
-            print(f"Error decrypting with provided QuODKey: {e}")
-            feedback = f"The key provided does not fit this lock: {e}"
-            return None, None, feedback
+            print(f"{feedback} Error decrypting with provided QuODKey: {e}")
+            feedback += f"The key provided does not fit this lock: {e}"
+            return None, None, feedback, {}

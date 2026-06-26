@@ -582,7 +582,7 @@ class QuodkInterface:
                 save_user = ""
                 save_pass = ""
             elif odk_access == 'locked' and odk_username and odk_pass:
-                save_pass, save_user = self.credential_manager.scrambler(odk_pass, odk_username, 'manual')
+                save_pass, save_user, feedback = self.credential_manager.scrambler(odk_pass, odk_username, 'manual')
             else:
                 save_pass = odk_pass
                 save_user = odk_username
@@ -676,23 +676,19 @@ class QuodkInterface:
                 if success:
                     odk_username = user
                     odk_pass = password
-            #print(odk_url,odk_username,odk_pass)
         elif trigger == 'auto':
             odk_url = self.odkURL
             odk_username = self.odkUser
             odk_pass = self.odkPass
         else:
             return
-
         # Try to get session token using library
         try:
             self.set_msg(self.tr_server_connecting, "background: none", trigger)
             session_manager = quodk_lib.SessionToken(odk_url, odk_username, odk_pass)
             self.session_token = session_manager.get_token()
-            #print('getting token', self.session_token)
             # Initialize data grabber with token
             self.data_grabber = quodk_lib.CentralDataGrab(self.session_token, odk_url)
-
             # Update UI on success
             self.dlg.projectID.addItem(self.tr_projectID)
             self.dlg.ODK_connect.setStyleSheet("background: DarkSeaGreen")
@@ -823,8 +819,6 @@ class QuodkInterface:
                         if trigger == 'config':
                             self.keyLevel = "PARENT_KEY"
                             self.list_submissions(rg_name,  trigger)
-
-                #print(f"Repeat groups: {self.repeatGroups}")
                 if len(self.repeatGroups) == 1 and trigger == 'manual': #auto-select the main form and get submissions if only main form exists
                     self.keyLevel = "KEY"
                     self.dlg.repeatGroup.setCurrentIndex(1)
@@ -841,6 +835,8 @@ class QuodkInterface:
                     self.dlg.dataset_config.clear()
                     self.dlg.dataset_config.addItem('Exclude Entities')
                     self.dlg.dataset_config.addItem(self.RelatedEntityList)
+                    self.dlg.label_dataset_config.setTextFormat(1)
+                    self.dlg.label_dataset_config.setText(f"Related Entities: <b>{self.RelatedEntityList}</b>")
                     self.dlg.dataset_config.setCurrentIndex(0)
                 if trigger == 'config':
                     self.updateGeomTable()
@@ -883,19 +879,18 @@ class QuodkInterface:
                     self.dlg.dataset_config.addItem(dataset_name)
                     self.dlg.dataset_existing.addItem(dataset_name)
                 if len(dataset_name) >= 1:
-                    print(f"Datasets: {self.dataset}")
                     self.dlg.dataset.setEnabled(True)
                     self.dlg.dataset_config.setEnabled(True)
                     self.dlg.dataset_existing.setEnabled(True)
                     self.dlg.label_dataset.setEnabled(True)
                     self.dlg.label_dataset_config.setEnabled(True)
-                    print(trigger)
                     if trigger == 'config':
-                        print('config')
                         self.dlg.dataset_config.setCurrentIndex(0)
-                        self.dlg.label_dataset_config.setTextFormat(1)
-                        self.dlg.label_dataset_config.setText(f"Entity List: <b>{dataset_name}</b>")
+                        #self.dlg.label_dataset_config.setTextFormat(1)
+                        #self.dlg.label_dataset_config.setText(f"Related Entities: <b>{self.RelatedEntityList}</b>")
                         self.list_Entities(trigger)
+                    else:
+                        self.dlg.label_dataset_config.setText("Entity Lists:")
                 else:
                     self.dlg.dataset.clear()
                     self.dlg.dataset_config.clear()
@@ -1025,7 +1020,6 @@ class QuodkInterface:
                 df, geom_opts, response, response_message = self.data_grabber.get_submissions(
                     project_id=self.selected_projectID, xml_form_id=self.xmlFormId, repeat_group=repeatGroup, top_n=10)
                 if response == 200:
-                    print(self.keyLevel)
                     if df.shape[0]>0:
                         self.populate_geometry(geom_opts)
                         if self.keyLevel == "KEY":
@@ -1065,10 +1059,7 @@ class QuodkInterface:
                     self.keyLevel = "KEY"
                 else:
                     self.keyLevel = "PARENT_KEY"
-
                 submissionsTotal = df.shape[0]
-                #print(repeatGroup, self.keyLevel,submissionsTotal)
-
                 #Main submission
                 if self.keyLevel == "KEY":
                     try:
@@ -1144,7 +1135,8 @@ class QuodkInterface:
         """Fetch entities for specified entity list and status."""
         if hasattr(self.dlg,'dataset') and self.dlg.dataset.currentText() != self.tr_selectdataset:
             self.entity_status = self.dlg.entity_status.currentText()
-        if self.EntityList:
+        if self.EntityList or self.RelatedEntityList:
+            EntityListName = self.EntityList if self.EntityList else self.RelatedEntityList
             self.keyLevel = "ENTITY_KEY"
             # Determine filter based on entity status
             if self.entity_status == self.tr_entitystatus[1]:  # New
@@ -1154,17 +1146,16 @@ class QuodkInterface:
             else:
                 if trigger == 'config':
                     status = "Both" # used for get_entities to collect the top 5 and ignore the date range
+                    EntityListName = self.dlg.dataset_config.currentText()
                     if hasattr(self.dlg,
-                               'dataset_config') and self.dlg.dataset_config.currentText() == 'Exclude Entities':
+                               'dataset_config') and (self.dlg.dataset_config.currentText() == 'Exclude Entities' or self.dlg.dataset_config.currentText() == self.tr_selectdataset):
                         self.dlg.entityFilter.clear()
                         self.clearFilter(trigger)
                         return
-                else:
-                    return
 
             try:
                 self.df_entities, geom_opts, response, response_message = self.data_grabber.get_entities(
-                    self.selected_projectID, self.EntityList,
+                    self.selected_projectID, EntityListName,
                     self.strSdate, self.strEdate, status)
                 if response == 200:
                     entitiesTotal = self.df_entities.shape[0]
@@ -1316,12 +1307,17 @@ class QuodkInterface:
 
     def filter_items(self, trigger):
         """Populate filter value combo based on selected attribute."""
+        print(trigger, self.keyLevel)
+        if trigger == 'config':
+            self.keyLevel = "KEY"
+        elif trigger == 'entity_config':
+            self.keyLevel = "ENTITY_KEY"
         if self.keyLevel not in ("KEY", "ENTITY_KEY"):
             return
 
         df_filter = self.df_submissions if self.keyLevel == "KEY" else self.df_entities
         filter_state = self.get_filter_state(trigger)
-
+        print(trigger, filter_state)
         # UI elements based on trigger
         suffix = "_2" if trigger == 'config' else ""
         attr_combo = getattr(self.dlg, f"attributeFilter{suffix}")
@@ -1333,7 +1329,6 @@ class QuodkInterface:
             clear_btn = getattr(self.dlg, 'entityClearFilter')
         filter_state['attributeFilter'] = attr_combo.currentText()
         clear_btn.setEnabled(True)
-        print(filter_state)
         if filter_state['attributeFilter'] != self.tr_attributeFilter:
             try:
                 val_combo.setEnabled(True)
@@ -1347,11 +1342,9 @@ class QuodkInterface:
                         selected_fields=filter_state['attributeFilter'])
                     val_combo.setEditable(True)
                 elif trigger == 'entity_config':
-                    print('entity_config')
                     df_filter, geom_opts, response, response_message = self.data_grabber.get_entities(
                     self.selected_projectID, self.EntityList,
                     None, None, 'filter', filter_state['attributeFilter'])
-                    print(df_filter.shape,response,response_message)
 
                 uniqueValues = df_filter[filter_state['attributeFilter']].unique().tolist()
                 for u in uniqueValues:
@@ -1373,7 +1366,6 @@ class QuodkInterface:
 
         filter_state = self.get_filter_state(trigger)
         filter_state['valueFilter'] = val_combo.currentText()
-        print(filter_state)
         clear_btn.setEnabled(True)
 
         if trigger == 'manual':
@@ -1407,7 +1399,6 @@ class QuodkInterface:
         if exclude_btn:
             exclude_btn.setChecked(False)
             exclude_btn.setText("is")
-        print(filter_state)
         if trigger == 'manual':
             self.set_geometry()
 
@@ -1426,7 +1417,6 @@ class QuodkInterface:
         else:
             exclude_btn.setText("is")
             filter_state['filterExclude'] = "False"
-        print(filter_state)
         if trigger == 'manual':
             self.set_geometry()
 
@@ -1454,7 +1444,7 @@ class QuodkInterface:
         self.dlg.odk_pass_2.setStyleSheet("border: none")
 
     def get_quodkey(self):
-        """Create a new QuodKey file for transit and double encrypt User and Password for sharing"""
+        """Create a new QuodKey file for transit and  encrypt User and Password for sharing"""
         if hasattr(self.dlg, 'QuODKey_generated'):
             # Decode bytes to string for display
             if not self.dlg.odk_pass_2.text():
@@ -1469,13 +1459,12 @@ class QuodkInterface:
             self.gotQuODKey = True
             # Show success message
             self.set_msg("Encryption key generated successfully.\n"
-                         "This key has been used to [double] encrypt your Auto-pilot files ready for sharing.\n"
+                         "This key has been used to encrypt your Auto-pilot settings ready for sharing.\n"
                          "(Copied to clipboard)",
                          "background: lightgreen", 'config')
-
-
             clipboard = QApplication.clipboard()
             clipboard.setText(key_return)
+
     def create_auto_pilot_file(self, trigger):
         """
         Open a save dialog to allow user to save Auto Pilot settings to a custom location.
@@ -1516,12 +1505,14 @@ class QuodkInterface:
             return
         else:
             self.dlg.odk_pass_2.setStyleSheet("border: 0px ")
+        quodkey = None
         if self.gotQuODKey is True:
-            # this auto-pilot config is for sharing so should be double encrypted
+            # this auto-pilot config is for sharing and has already been encrypted with the generated QuODKey
             self.permissions = 'locked'
+            quodkey = self.dlg.QuODKey_generated.text()
         else:
-            #use existing quodkey and leave unlocked
-            self.quodkey_pass,self.quodkey_user = self.credential_manager.scrambler(self.dlg.odk_pass_2.text(),
+            #use existing quodkey
+            self.quodkey_pass,self.quodkey_user, feedback = self.credential_manager.scrambler(self.dlg.odk_pass_2.text(),
                                                                                     self.dlg.odk_username_2.text(),
                                                                                     'manual')
             self.permissions = 'unlocked'
@@ -1550,8 +1541,15 @@ class QuodkInterface:
             # Ensure .json extension
             if not file_path.endswith('.json'):
                 file_path += '.json'
-
-            # Create Auto Pilot settings dictionary from config context or update auto-pilot (e.g. to unlock password)
+            self.reset_msg()
+            # Create Auto Pilot settings dictionary from config context
+            filters = {
+                'attributeFilter': self.config_filter.get('attributeFilter', None),
+                'valueFilter': self.config_filter.get('valueFilter', None),
+                'entityFilter': entityFilter,
+                'entityFilterValue': entityFilterValue
+            }
+            scrambled_filters = self.credential_manager.scramble_filters(filters, trigger, quodkey)
 
             config = {
                 'odkURL': getattr(self, 'odkURL', ''),
@@ -1562,12 +1560,12 @@ class QuodkInterface:
                 'xmlFormId': getattr(self, 'xmlFormId', ''),
                 'FormName': getattr(self, 'formName', ''),
                 'crs': getattr(self, 'projection', 'EPSG:4326'),
-                'attributeFilter': self.config_filter.get('attributeFilter', None),
-                'valueFilter': self.config_filter.get('valueFilter', None),
+                'attributeFilter': scrambled_filters.get('attributeFilter', None),
+                'valueFilter': scrambled_filters.get('valueFilter', None),
                 'filterExclude': self.config_filter.get('filterExclude', 'False'),
                 'entitylist': getattr(self, 'RelatedEntityList', None),
-                'entityFilter': entityFilter,
-                'entityFilterValue': entityFilterValue,
+                'entityFilter': scrambled_filters.get('entityFilter', None),
+                'entityFilterValue': scrambled_filters.get('entityFilterValue', None),
                 'entityFilterExclude': entityFilterExclude,
                 'repeats': getattr(self, 'repeats', []),
                 'lastEndDateTime': getattr(self, 'lastEnd', None),
@@ -1579,7 +1577,7 @@ class QuodkInterface:
                     settings = QSettings()
                     settings.setValue('QuODK/auto_pilot_path', file_path)
 
-                self.set_msg(f"[Double] encrypted Auto Pilot file saved to:\n{file_path}",
+                self.set_msg(f"Encrypted Auto Pilot file saved to:\n{file_path}",
                                 "background: lightgreen", trigger)
 
 
@@ -1619,12 +1617,9 @@ class QuodkInterface:
             LayerName = f'QuODK_ENTITY_{self.EntityList}_{self.entity_status}'
         else:
             return
-        #print (f"LayerName: {LayerName}", self.keyLevel, df_layer.shape[0])
         # Reset index
         df_layer.index = range(len(df_layer.index))
-
         self.nogeom, count = quodk_lib.load_layer_to_canvas(df_layer, LayerName, self.keyLevel,self.repeatGeom, self.projection)
-
         self.msgText += f"{self.tr_layer_added}{self.projection}\n{count} features and {self.nogeom} rows without geometry\n"
         self.set_msg(self.msgText, "color: black; background: DarkSeaGreen", trigger)
         self.dlg.progressBar.setRange(0, 100)
@@ -1642,24 +1637,20 @@ class QuodkInterface:
         except Exception as e:
             default_folder = os.path.join(Path.home(), 'ODK_images')
         aFolder = QFileDialog.getExistingDirectory(None, self.tr_image_folder,default_folder, QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
-
         if not aFolder:
             return
-
         self.dlg.progressBar.setRange(0, 100)
         self.dlg.progressBar.setTextVisible(True)
         if self.dlg.attach_overwrite.isChecked():
             overwrite = True
         else:
             overwrite = False
-
         try:
             def progress_update(current, total):
                 progress = int((current / total) * 100)
                 progress_text = f" {progress}% of {total}"
                 self.dlg.progressBar.setValue(progress)
                 self.dlg.progressBar.setFormat(progress_text)
-
             count, missing, skipped = self.data_grabber.download_attachments(
                 self.selected_projectID,
                 self.xmlFormId,
@@ -1682,12 +1673,10 @@ class QuodkInterface:
             self.set_msg(f"{self.tr_attachments_error}: {str(e)}",
                          "color: black; background: red", 'manual')
 
-
     # ====================================================================================================
     # Export data to CSV
     # ====================================================================================================
 
-    # write filtered DataFrame to CSV
     def save_csv_file(self):
         projection = "EPSG:4326"
         layerGeom = ''

@@ -91,7 +91,6 @@ def construct_geometry(df_layer, layerGeom, geomName, geomCol):
         pandas DataFrame with 'geom_from_ODK' column populated with WKT strings
     """
     nogeom = 0
-    #print('df_layer:',df_layer)
     for i, iData in df_layer.iterrows():
         iValues = df_layer.loc[i, geomCol]
 
@@ -621,14 +620,12 @@ class CentralDataGrab:
                         f"__system/updatedAt ge {date_start} and "
                         f"__system/updatedAt le {date_end}")
         elif status == 'filter':
-            print('filter')
             filter_url = f"{dataset_url}{entity_list_name}.svc/Entities?$select={selected_fields}"
         else:
             filter_url = f"{dataset_url}{entity_list_name}.svc/Entities?$top={5}"
         # Fetch data
         print(filter_url)
         df_odk, geom_options, response_code, server_response = self._get_odata_response(filter_url, "ENTITY_KEY", entity_list_name)
-
         return df_odk, geom_options, response_code, server_response
 
     def get_odata_filter(self, project_id, xml_form_id, selected_fields=None):
@@ -678,10 +675,7 @@ class CentralDataGrab:
             filter_url,
             headers={"Authorization": f"Bearer {self.session_token}"}
         )
-
         server_response = {'message': response.json()['message'] if 'message' in response.json() else None,'code': response.json()['code'] if 'code' in response.json() else None}
-
-        print(server_response)
         if response.status_code != 200:
             return None, geom_options,response.status_code,server_response
         else:
